@@ -42,3 +42,15 @@ def test_detect_out_dir_prefers_provider_folder(tmp_path):
 
 def test_detect_out_dir_falls_back(tmp_path):
     assert detect_out_dir(tmp_path) == (tmp_path / ".ai-control-center").resolve()
+
+
+def test_generate_includes_provider_folder_markdown(tmp_path):
+    claude = tmp_path / ".claude"
+    claude.mkdir()
+    (claude / "CLAUDE.md").write_text("# Claude Instructions\n\nProject rules.")
+    out = generate(tmp_path)
+    # out_dir is .claude when that folder exists
+    assert out.resolve() == (tmp_path / ".claude" / "dashboard.html").resolve()
+    html = out.read_text(encoding="utf-8")
+    assert "Claude Instructions" in html
+    assert ".claude/CLAUDE.md" in html

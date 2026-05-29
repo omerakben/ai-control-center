@@ -23,8 +23,10 @@ def _build_search(part: dict) -> list[dict]:
     records: list[dict] = []
     for group in part["docs"].values():
         for doc in group:
+            # summary is already HTML-escaped by _escape_plain_text_fields;
+            # do NOT call _html.escape again or & becomes &amp;amp; etc.
             records.append({"id": doc["id"], "title": doc["title"],
-                            "path": doc["path"], "text": _html.escape(doc.get("summary", ""))})
+                            "path": doc["path"], "text": doc.get("summary", "")})
     records.sort(key=lambda r: (r["path"], r["title"]))
     return records
 
@@ -40,15 +42,18 @@ def _escape_plain_text_fields(part: dict) -> None:
 def generate(root: Path, out_dir: Path | None = None) -> Path:
     root = root.resolve()
 
-    # Resolve out_dir early so we can exclude it from the source scan, which
-    # keeps source_digest stable across repeated calls (the written dashboard
-    # must not feed back into its own digest).
+    # Resolve out_dir early so we can compute the dashboard path and exclude
+    # only that one file from the source scan.  Provider-folder markdown
+    # (.claude/**, .codex/**, .cursor/**) must remain in the scan — that is
+    # the content this tool exists to surface.  Excluding only the generated
+    # dashboard keeps source_digest stable across repeated calls without
+    # silently dropping provider-folder docs.
     out_dir = out_dir.resolve() if out_dir else detect_out_dir(root)
+    dashboard = (out_dir / "dashboard.html").resolve()
 
     all_files = scan_files(root)
-    # Exclude anything written under the output directory.
-    files = [f for f in all_files if not str(f.resolve()).startswith(str(out_dir) + "/")
-             and f.resolve() != out_dir]
+    # Exclude ONLY the generated dashboard, not the whole provider directory.
+    files = [f for f in all_files if f.resolve() != dashboard]
 
     ctx = ScanContext(root=root, files=files)
     adapter = GenericAdapter()
@@ -59,7 +64,6 @@ def generate(root: Path, out_dir: Path | None = None) -> Path:
     _escape_plain_text_fields(part)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    dashboard = out_dir / "dashboard.html"
 
     data = {
         "schemaVersion": SCHEMA_VERSION,
