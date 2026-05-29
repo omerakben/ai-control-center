@@ -38,3 +38,7 @@ Later: a global cross-repo view, an interactive relationship graph, and richer i
 ## Distribution
 
 Ships as a standalone skill plus a marketplace plugin. The skill, the generator, and the HTML it produces are the whole product.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
