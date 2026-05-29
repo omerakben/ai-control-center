@@ -12,5 +12,15 @@
 *.log
 Thumbs.db
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# Generated dashboards (the tool's own output, when run on this repo)
+.ai-control-center/
+
 # Node (if the generator gains a JS toolchain later)
 node_modules/

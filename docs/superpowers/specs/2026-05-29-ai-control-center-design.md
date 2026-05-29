@@ -149,7 +149,7 @@ Sections with no data hide. The provider's root markdown links to the dashboard 
 
 ## Security
 
-- Redaction at extraction, not after. Config fields are allowlisted before their values can enter summaries, search text, HTML, or warnings. A secret-shaped-string scanner masks anything resembling a key, token, bearer header, or connection URL. Redaction fails closed: a suspicious value is omitted, never emitted.
+- Redaction at extraction, not after. Two tiers with different guarantees. Structured provider config (MCP servers, settings) is allowlisted: only known-safe fields pass, everything else is dropped, so this tier fails closed. Free-form prose (docs, PRDs, ADRs) is run through a high-precision secret-shaped-string scanner that masks bearer headers, keyword assignments, provider-prefixed keys, and credential URLs; this tier is best-effort by design (it favors precision over recall to avoid mangling normal prose, so high-entropy secrets with no telltale prefix can slip through). Phase 1 ships only the generic prose scanner; the allowlist path is exercised when the provider adapters land. Neither tier emits a value it recognized as secret.
 - The dashboard is committed, executable HTML, so it is treated as a stored-XSS surface. The renderer builds text with `textContent` and only injects a sanitized markdown subset (headings, paragraphs, lists, code, links). No raw HTML passthrough from repo content.
 - The generator runs offline by default and states what it reads, which matters for public distribution trust.
 
