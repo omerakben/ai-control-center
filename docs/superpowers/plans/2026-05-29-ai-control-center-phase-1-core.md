@@ -428,7 +428,17 @@ def test_escapes_raw_html_and_scripts():
 
 def test_blocks_javascript_links():
     html = render_markdown_safe("[click](javascript:alert(1))")
-    assert "javascript:" not in html or "href=\"javascript:" not in html
+    assert 'href="javascript:' not in html
+
+
+def test_blocks_javascript_md_suffix_bypass():
+    html = render_markdown_safe("[x](javascript:void0//y.md)")
+    assert 'href="javascript:' not in html
+
+
+def test_blocks_protocol_relative_links():
+    html = render_markdown_safe("[x](//evil.com/exfil)")
+    assert 'href="//evil.com' not in html
 
 
 def test_allows_relative_and_https_links():
@@ -449,6 +459,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'acc.markdown'`
 ```python
 import html
 import re
+from urllib.parse import urlparse
 
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 _CODE = re.compile(r"`([^`]+)`")
@@ -457,8 +468,13 @@ _LIST_ITEM = re.compile(r"\s*[-*]\s+")
 
 
 def _safe_link(match: re.Match) -> str:
+    # validate the scheme explicitly — never by suffix. A suffix check like
+    # url.endswith(".md") lets `javascript:void0//y.md` through with a live href.
     label, url = match.group(1), match.group(2)
-    if url.startswith(("http://", "https://", "/", "./", "../")) or url.endswith(".md"):
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    is_relative = not parsed.scheme and not url.startswith("//")  # block //host too
+    if scheme in ("http", "https") or is_relative:
         return f'<a href="{url}">{label}</a>'
     return f"{label} ({url})"
 
