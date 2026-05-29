@@ -1,0 +1,46 @@
+# ============================================================================
+# Codex CLI — project config for html-dash
+# Scope: this project only. Overrides ~/.codex/config.toml for sessions run here.
+# Manage with: /codex-config (show | set | enable-mcp | disable-mcp | reset)
+# ============================================================================
+
+# Core
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+sandbox = "workspace-write"
+approval_policy = "on-request"
+web_search = "live"
+
+[features]
+# enable per-project features here as needed
+
+# ============================================================================
+# Curated MCP servers (disabled by default — keep MCP enablement minimal)
+# Enable with: /codex-config enable-mcp <name>
+# ============================================================================
+
+# Context7 — up-to-date library/framework docs
+# [mcp_servers.context7]
+# command = "npx"
+# args = ["-y", "@upstash/context7-mcp"]
+# startup_timeout_sec = 10
+# tool_timeout_sec = 60
+
+# Playwright — browser automation / dashboard UI testing
+# [mcp_servers.playwright]
+# command = "npx"
+# args = ["-y", "@playwright/mcp"]
+# startup_timeout_sec = 15
+# tool_timeout_sec = 120
+
+# ============================================================================
+# Profiles (disabled by default) — uses live models only
+# ============================================================================
+
+# [profiles.fast]
+# model = "gpt-5.3-codex"
+# model_reasoning_effort = "medium"
+
+# [profiles.thorough]
+# model = "gpt-5.5"
+# model_reasoning_effort = "xhigh"
