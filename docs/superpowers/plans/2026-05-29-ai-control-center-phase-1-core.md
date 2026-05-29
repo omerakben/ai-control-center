@@ -1187,6 +1187,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'acc.generate'`
 `src/acc/generate.py`:
 
 ```python
+import html as _html
 from pathlib import Path
 from .scan import scan_files
 from .digest import source_digest
@@ -1211,30 +1212,51 @@ def _build_search(part: dict) -> list[dict]:
     records: list[dict] = []
     for group in part["docs"].values():
         for doc in group:
+            # summary is already HTML-escaped by _escape_plain_text_fields;
+            # do NOT escape again or & becomes &amp;amp;.
             records.append({"id": doc["id"], "title": doc["title"],
                             "path": doc["path"], "text": doc.get("summary", "")})
     records.sort(key=lambda r: (r["path"], r["title"]))
     return records
 
 
+def _escape_plain_text_fields(part: dict) -> None:
+    """HTML-escape plain-text summaries so raw tags never reach the data island."""
+    for group in part["docs"].values():
+        for doc in group:
+            if "summary" in doc:
+                doc["summary"] = _html.escape(doc["summary"])
+
+
 def generate(root: Path, out_dir: Path | None = None) -> Path:
     root = root.resolve()
-    files = scan_files(root)
+    # Resolve out_dir early so we can exclude ONLY the generated dashboard.html
+    # from the scan. Provider-folder markdown (.claude/**, .codex/**, .cursor/**)
+    # must stay in the scan — it is the content this tool exists to surface.
+    # Excluding only the written file keeps source_digest stable across runs
+    # without dropping provider docs.
+    out_dir = out_dir.resolve() if out_dir else detect_out_dir(root)
+    dashboard = (out_dir / "dashboard.html").resolve()
+
+    files = [f for f in scan_files(root) if f.resolve() != dashboard]
     ctx = ScanContext(root=root, files=files)
     adapter = GenericAdapter()
     proot = adapter.detect(ctx)[0]
     part = adapter.normalize(ctx, proot)
+    _escape_plain_text_fields(part)
 
-    out_dir = (out_dir or detect_out_dir(root))
     out_dir.mkdir(parents=True, exist_ok=True)
-    dashboard = out_dir / "dashboard.html"
 
     data = {
         "schemaVersion": SCHEMA_VERSION,
         "generator": {"name": "ai-control-center", "version": __version__, "rendererDigest": ""},
         "source": {
             "repoName": root.name,
-            "dashboardPath": dashboard.resolve().relative_to(root).as_posix(),
+            "dashboardPath": (
+                dashboard.relative_to(root).as_posix()
+                if dashboard.is_relative_to(root)
+                else str(dashboard)
+            ),
             "sourceDigest": source_digest(files, root),
             "vcs": {"kind": "none"},
         },
@@ -1249,6 +1271,12 @@ def generate(root: Path, out_dir: Path | None = None) -> Path:
     dashboard.write_text(render_html(data), encoding="utf-8")
     return dashboard
 ```
+
+> Note: the original draft of this task scanned the whole repo (re-ingesting the
+> written `dashboard.html` and breaking determinism) and excluded the entire
+> output directory (which dropped provider-folder docs). The version above is the
+> corrected, shipped implementation: it excludes only the generated file,
+> escapes plain-text summaries, and guards `relative_to` for external `--out`.
 
 - [ ] **Step 4: Write the CLI**
 
