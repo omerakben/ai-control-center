@@ -30,3 +30,12 @@ def test_render_neutralizes_script_close_in_island():
     # the raw closing tag must not appear inside the JSON island
     island = html.split('id="acc-data"', 1)[1].split("</script>", 1)[0]
     assert "</script>" not in island
+
+
+def test_render_does_not_corrupt_island_with_placeholder_text():
+    data = _data()
+    data["project"]["title"] = "mentions __SCHEMA_VERSION__ and __DATA_ISLAND__"
+    html = render_html(data)
+    island = html.split('id="acc-data"', 1)[1].split("</script>", 1)[0]
+    assert "__SCHEMA_VERSION__" in island
+    assert "__DATA_ISLAND__" in island
