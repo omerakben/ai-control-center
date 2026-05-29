@@ -1,5 +1,6 @@
 import html
 import re
+from urllib.parse import urlparse
 
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 _CODE = re.compile(r"`([^`]+)`")
@@ -9,7 +10,10 @@ _LIST_ITEM = re.compile(r"\s*[-*]\s+")
 
 def _safe_link(match: re.Match) -> str:
     label, url = match.group(1), match.group(2)
-    if url.startswith(("http://", "https://", "/", "./", "../")) or url.endswith(".md"):
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    is_relative = not parsed.scheme and not url.startswith("//")
+    if scheme in ("http", "https") or is_relative:
         return f'<a href="{url}">{label}</a>'
     return f"{label} ({url})"
 

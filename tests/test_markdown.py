@@ -20,7 +20,17 @@ def test_escapes_raw_html_and_scripts():
 
 def test_blocks_javascript_links():
     html = render_markdown_safe("[click](javascript:alert(1))")
-    assert "javascript:" not in html or "href=\"javascript:" not in html
+    assert 'href="javascript:' not in html
+
+
+def test_blocks_javascript_md_suffix_bypass():
+    html = render_markdown_safe("[x](javascript:void0//y.md)")
+    assert 'href="javascript:' not in html
+
+
+def test_blocks_protocol_relative_links():
+    html = render_markdown_safe("[x](//evil.com/exfil)")
+    assert 'href="//evil.com' not in html
 
 
 def test_allows_relative_and_https_links():
