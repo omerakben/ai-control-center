@@ -81,7 +81,7 @@ def generate(root: Path, out_dir: Path | None = None) -> Path:
         "providers": [{"id": "generic", "displayName": "Generic", "root": "."}],
         "project": part["project"],
         "inventory": part["inventory"],
-        "docs": {**part["docs"], "references": part["docs"]["references"]},
+        "docs": part["docs"],
         "relationships": part["relationships"],
         "search": _build_search(part),
     }

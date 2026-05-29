@@ -1,4 +1,3 @@
-from pathlib import Path
 from acc.ids import stable_id, rel_posix
 
 

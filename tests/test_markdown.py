@@ -37,3 +37,8 @@ def test_allows_relative_and_https_links():
     html = render_markdown_safe("[doc](./x.md) and [site](https://example.com)")
     assert 'href="./x.md"' in html
     assert 'href="https://example.com"' in html
+
+
+def test_renders_plus_bullet_list():
+    html = render_markdown_safe("+ alpha\n+ beta")
+    assert "<ul>" in html and "<li>alpha</li>" in html and "<li>beta</li>" in html

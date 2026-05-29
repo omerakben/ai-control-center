@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 _LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 _CODE = re.compile(r"`([^`]+)`")
 _HEADING = re.compile(r"(#{1,6})\s+(.*)")
-_LIST_ITEM = re.compile(r"\s*[-*]\s+")
+_LIST_ITEM = re.compile(r"\s*[-*+]\s+")
 
 
 def _safe_link(match: re.Match) -> str:

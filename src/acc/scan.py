@@ -6,7 +6,9 @@ DEFAULT_EXCLUDES = {
 }
 
 
-def scan_files(root: Path, excludes: set[str] = DEFAULT_EXCLUDES) -> list[Path]:
+def scan_files(root: Path, excludes: set[str] | None = None) -> list[Path]:
+    if excludes is None:
+        excludes = DEFAULT_EXCLUDES
     root = root.resolve()
     out: list[Path] = []
     for p in root.rglob("*"):

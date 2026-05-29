@@ -4,7 +4,7 @@ from ..ids import stable_id, rel_posix
 from ..redaction import redact_text
 from ..markdown import render_markdown_safe
 
-_TODO = re.compile(r"^\s*[-*]\s*\[ \]\s*(.+)$")
+_TODO = re.compile(r"^\s*[-*+]\s*\[ \]\s*(.+)$")
 _HEADING = re.compile(r"^\s*#{1,6}\s+(.*)$")
 
 
