@@ -15,6 +15,12 @@ def test_stable_id_changes_with_inputs():
     assert base != stable_id("claude", "doc", "docs/x.md", "Title")
     assert base != stable_id("generic", "skill", "docs/x.md", "Title")
     assert base != stable_id("generic", "doc", "docs/y.md", "Title")
+    assert base != stable_id("generic", "doc", "docs/x.md", "Other")
+
+
+def test_stable_id_delimiter_prevents_collision():
+    # without the NUL delimiter these would collide
+    assert stable_id("a", "bc", "d", "") != stable_id("a", "b", "cd", "")
 
 
 def test_rel_posix_uses_forward_slashes(tmp_path):
