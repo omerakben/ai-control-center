@@ -47,7 +47,7 @@ These were resolved during design. Each one closes off an alternative on purpose
 
 ### Generation pipeline
 
-```
+```text
 scan sorted files
   -> adapter extract (allowlisted config fields only)
   -> redact prose and structured values
@@ -126,7 +126,7 @@ The HTML displays its `sourceDigest`, scanned file count, and provider roots, an
 
 One merged dashboard, never parallel copies.
 
-```
+```text
 If one dashboard exists, update it.
 If none exists, create it under the currently running provider folder.
 If multiple dashboards exist, stop and ask which is the owner.

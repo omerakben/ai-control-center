@@ -1,0 +1,16 @@
+# Tool-local state — not part of the product
+.remember/
+.superpowers/
+
+# Secrets and env
+.env
+.env.*
+!.env.example
+
+# OS and editor cruft
+.DS_Store
+*.log
+Thumbs.db
+
+# Node (if the generator gains a JS toolchain later)
+node_modules/
