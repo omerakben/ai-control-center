@@ -1,0 +1,20 @@
+:root { color-scheme: light dark; --fg: #1a1a1a; --muted: #666; --line: #ddd; --bg: #fff; }
+@media (prefers-color-scheme: dark) { :root { --fg: #e6e6e6; --muted: #999; --line: #333; --bg: #111; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.6 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header.acc-head { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header.acc-head strong { font-size: 16px; }
+.acc-meta { color: var(--muted); font-size: 11px; margin-left: auto; }
+nav.acc-nav { position: sticky; top: 44px; background: var(--bg); border-bottom: 1px solid var(--line);
+  padding: 6px 16px; display: flex; gap: 8px; }
+nav.acc-nav a { text-decoration: none; border: 1px solid var(--line); border-radius: 10px;
+  padding: 2px 10px; color: var(--fg); font-size: 12px; }
+#acc-search { padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); }
+section { padding: 16px; border-bottom: 1px solid var(--line); }
+.acc-label { text-transform: uppercase; letter-spacing: .05em; font-size: 11px; color: var(--muted); }
+.acc-row { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 6px 0; }
+.acc-row .badge { border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; font-size: 10px; color: var(--muted); }
+.acc-row .path { color: var(--muted); font-size: 11px; }
+footer.acc-foot { padding: 16px; color: var(--muted); font-size: 11px; }
+.acc-hidden { display: none; }
