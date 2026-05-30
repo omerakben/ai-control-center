@@ -95,12 +95,20 @@ def _build_search(inv: dict, docs: dict) -> list[dict]:
     return records
 
 
-def _escape_summaries(inv: dict, docs: dict) -> None:
+def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
+    # Escape every author-derived plain-text display field so hostile content
+    # (script tags, onerror, </script>) can never reach the data island raw.
+    # The `html` field is already sanitized by render_markdown_safe — leave it.
     for bucket in (inv, docs):
         for items in bucket.values():
             for it in items:
-                if "summary" in it:
-                    it["summary"] = _html.escape(it["summary"])
+                for field in ("title", "summary"):
+                    if field in it:
+                        it[field] = _html.escape(it[field])
+    project["title"] = _html.escape(project.get("title", ""))
+    for todo in project.get("openTodos", []):
+        if "text" in todo:
+            todo["text"] = _html.escape(todo["text"])
 
 
 def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
@@ -111,7 +119,11 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
     out_dir = out_dir.resolve() if out_dir else resolve_owner(root, detected_ids, owner)
     dashboard = (out_dir / "dashboard.html").resolve()
 
-    files = [f for f in all_files if f.resolve() != dashboard]
+    # Exclude every known dashboard.html (not just the target) so a stale
+    # dashboard left in another provider folder cannot perturb sourceDigest.
+    known_dashboards = {(root / d / "dashboard.html").resolve() for d in _KNOWN_OWNER_DIRS}
+    known_dashboards.add(dashboard)
+    files = [f for f in all_files if f.resolve() not in known_dashboards]
     ctx = ScanContext(root=root, files=files)
 
     parts: list[dict] = []
@@ -135,8 +147,8 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
                                "root": ".", "detected": True})
 
     inv, docs = _merge_parts(parts)
-    _escape_summaries(inv, docs)        # escape plain-text summaries for the island
-    search = _build_search(inv, docs)   # search reads escaped summaries (Phase 1 contract)
+    _escape_text_fields(inv, docs, gpart["project"])  # escape titles/summaries for the island
+    search = _build_search(inv, docs)   # search reads the escaped fields (Phase 1 contract)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 

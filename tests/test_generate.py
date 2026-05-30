@@ -1,7 +1,8 @@
 import json
+import re
 from pathlib import Path
 from acc.generate import generate, detect_out_dir
-from tests.builders import make_multi_provider_repo, make_claude_repo
+from tests.builders import make_multi_provider_repo, make_claude_repo, make_codex_repo
 
 
 def _make_repo(tmp_path):
@@ -111,3 +112,26 @@ def test_generate_tripwire_blocks_unredacted_leak(tmp_path):
     out = generate(tmp_path)
     # the description is redacted, so the token never reaches the file
     assert "ghp_0123456789abcdefghij" not in out.read_text(encoding="utf-8")
+
+
+def test_generate_escapes_hostile_title(tmp_path):
+    # a hostile frontmatter name lands in an item title — must be escaped in the island
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "x.md").write_text(
+        '---\nname: "<img src=x onerror=alert(1)>"\ndescription: ok\n---\n')
+    html = generate(tmp_path).read_text(encoding="utf-8")
+    assert "onerror=alert(1)>" not in html
+    assert "&lt;img" in html
+
+
+def test_generate_digest_ignores_stale_other_dashboard(tmp_path):
+    make_codex_repo(tmp_path)
+    out_dir = tmp_path / ".codex"
+    first = generate(tmp_path, out_dir=out_dir).read_text(encoding="utf-8")
+    # a stale dashboard left in another provider folder must not perturb the digest
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "dashboard.html").write_text("<stale>" * 100)
+    second = generate(tmp_path, out_dir=out_dir).read_text(encoding="utf-8")
+    dig = lambda h: re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
+    assert dig(first) == dig(second)
