@@ -145,6 +145,12 @@
     if (bento.children.length) host.appendChild(bento);
   }
 
+  function renderBanner() {
+    if (!(data.generator && data.generator.truncated)) return;
+    document.getElementById("acc-banner").appendChild(el("div", "acc-noticetext",
+      "This dashboard was reduced to a summary because the full output exceeded the size budget."));
+  }
+
   function wireSearch() {
     var box = document.getElementById("acc-search");
     box.addEventListener("input", function () {
@@ -157,6 +163,7 @@
   }
 
   renderHead();
+  renderBanner();
   renderOverview();
   renderInventory();
   renderDocs();

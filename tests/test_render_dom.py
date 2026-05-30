@@ -6,7 +6,7 @@ so inline <script> runs and the JSON island is parsed exactly as in the wild.
 from pathlib import Path
 
 from acc.generate import generate
-from tests.builders import make_multi_provider_repo, make_brownfield_repo
+from tests.builders import make_multi_provider_repo, make_brownfield_repo, make_large_repo
 
 
 def _html(repo: Path) -> str:
@@ -75,3 +75,16 @@ def test_overview_generic_only_when_sole(page, tmp_path):
     prov = page.locator("#acc-overview .acc-card", has_text="Providers")
     assert prov.locator(".acc-chip", has_text="Generic").count() == 1
     assert prov.locator(".acc-chip").count() == 1  # only generic, no phantom provider
+
+
+def test_truncation_banner_when_truncated(page, tmp_path):
+    make_large_repo(tmp_path, 150)  # forces summary-only
+    page.set_content(_html(tmp_path))
+    banner = page.locator("#acc-banner")
+    assert banner.inner_text().strip() != ""
+
+
+def test_no_banner_when_full(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    assert page.locator("#acc-banner").inner_text().strip() == ""
