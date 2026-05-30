@@ -164,6 +164,13 @@
       bento.appendChild(dc);
     }
 
+    var rels = data.relationships || [];
+    if (rels.length) {
+      var xc = card("Cross-references", "crossref");
+      xc.appendChild(el("div", null, plural(rels.length, "edges")));
+      bento.appendChild(xc);
+    }
+
     if (bento.children.length) host.appendChild(bento);
   }
 
@@ -269,6 +276,49 @@
         if (node) box.appendChild(node);
       });
       if (box.children.length) row.appendChild(box);
+    });
+  }
+
+  function sourceLabel(fromId, sampleEdge) {
+    var meta = metaById[fromId];
+    if (meta) return { title: htmlUnescape(meta.title), type: meta.typeLabel, sort: meta.path || meta.title };
+    return { title: sampleEdge.evidence, type: "config", sort: sampleEdge.evidence };
+  }
+
+  function renderCrossReferences() {
+    var host = document.getElementById("acc-crossref");
+    if (!host) return;
+    var edges = data.relationships || [];
+    if (!edges.length) {
+      host.appendChild(el("div", "acc-xref-empty", "No cross-references found"));
+      return;
+    }
+    var bySource = {};
+    edges.forEach(function (e) { (bySource[e.from] || (bySource[e.from] = [])).push(e); });
+    var groups = Object.keys(bySource).map(function (fromId) {
+      return { fromId: fromId, label: sourceLabel(fromId, bySource[fromId][0]), edges: bySource[fromId] };
+    });
+    groups.sort(function (a, b) { return a.label.sort < b.label.sort ? -1 : a.label.sort > b.label.sort ? 1 : 0; });
+    groups.forEach(function (g) {
+      var head = el("div", "acc-xref-source");
+      head.appendChild(el("span", "acc-chip", g.label.type));
+      head.appendChild(el("span", "acc-xref-srctitle", g.label.title));
+      host.appendChild(head);
+      var targets = g.edges.map(function (e) {
+        var m = metaById[e.to] || {};
+        return { e: e, title: htmlUnescape(m.title || ""), type: m.typeLabel || "", sort: (m.path || m.title || "") };
+      });
+      targets.sort(function (a, b) { return a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0; });
+      targets.forEach(function (t) {
+        var btn = el("button", "acc-xref-edge");
+        btn.type = "button";
+        btn.appendChild(el("span", "acc-rel-verb", t.e.type === "declares" ? "declares" : "references"));
+        btn.appendChild(el("span", "acc-chip", t.type));
+        btn.appendChild(el("span", "acc-rel-title", t.title));
+        btn.appendChild(el("span", "path", t.e.evidence));
+        btn.addEventListener("click", function () { jumpTo(t.e.to); });
+        host.appendChild(btn);
+      });
     });
   }
 
@@ -428,6 +478,7 @@
   renderTodos();
   buildRowIndex();
   decorateRelated();
+  renderCrossReferences();
   wireOmnibox();
   wireSearch();
 })();

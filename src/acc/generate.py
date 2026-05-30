@@ -125,8 +125,12 @@ def _build_relationships(inv: dict, docs: dict) -> list[dict]:
             path_ids.setdefault(it["path"], set()).add(it["id"])
     unique = {p: next(iter(ids)) for p, ids in path_ids.items()
               if len(ids) == 1 and p not in _CONFIG_PATHS}
-    # boundary match: reject a hit that is part of a longer path/word token
-    matchers = {p: re.compile(r"(?<![\w./-])" + re.escape(p) + r"(?![\w./-])")
+    # boundary match: reject a hit that is part of a longer path/word token.
+    # The trailing guard rejects a path that continues into more word/slash/
+    # hyphen chars (e.g. ".md.bak") but allows a sentence-ending period
+    # ("...reviewer.md." at a clause boundary), so a path that closes a
+    # sentence still produces a reference edge.
+    matchers = {p: re.compile(r"(?<![\w./-])" + re.escape(p) + r"(?![\w/-])(?!\.[\w/-])")
                 for p in unique}
     for bucket in docs.values():
         for doc in bucket:

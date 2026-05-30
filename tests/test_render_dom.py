@@ -306,6 +306,22 @@ def test_inline_related_is_bidirectional_and_jumps(page, tmp_path):
     assert mcp_row.locator('.acc-related', has_text="declared in").count() == 1
 
 
+def test_crossref_view_grouped_by_source_and_sorted(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "links.md").write_text(
+        "# Links\n\nSee .claude/agents/reviewer.md.")
+    page.set_content(_html(tmp_path))
+    cross = page.locator("#acc-crossref")
+    assert cross.locator(".acc-xref-source", has_text=".claude/settings.json").count() == 1
+    assert cross.locator(".acc-xref-source", has_text=".cursor/mcp.json").count() == 1
+    src_headers = cross.locator(".acc-xref-source")
+    texts = [src_headers.nth(i).inner_text() for i in range(src_headers.count())]
+    assert texts == sorted(texts)  # display-sorted
+    cross.locator("button", has_text="reviewer").first.click()
+    flashed = page.locator("#acc-inventory .acc-item.acc-flash", has_text="reviewer")
+    assert flashed.count() == 1
+
+
 def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
