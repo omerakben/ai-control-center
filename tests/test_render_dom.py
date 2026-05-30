@@ -54,3 +54,24 @@ def test_search_filters_rows(page, tmp_path):
     after = visible()
     assert 0 < after < before  # typing narrows the visible rows
     assert page.locator(".acc-item:not(.acc-hidden)", has_text="figma").count() >= 1
+
+
+def test_overview_bento_cards(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    ov = page.locator("#acc-overview .acc-bento")
+    assert ov.count() == 1
+    cards = ov.locator(".acc-card")
+    assert cards.count() >= 4  # Providers, Inventory, TODOs, Docs
+    # generic is not shown when real providers exist
+    prov = ov.locator(".acc-card", has_text="Providers")
+    assert prov.locator(".acc-chip", has_text="Generic").count() == 0
+    assert prov.locator(".acc-chip", has_text="Claude Code").count() == 1
+
+
+def test_overview_generic_only_when_sole(page, tmp_path):
+    make_brownfield_repo(tmp_path)  # no AI provider -> generic only
+    page.set_content(_html(tmp_path))
+    prov = page.locator("#acc-overview .acc-card", has_text="Providers")
+    assert prov.locator(".acc-chip", has_text="Generic").count() == 1
+    assert prov.locator(".acc-chip").count() == 1  # only generic, no phantom provider

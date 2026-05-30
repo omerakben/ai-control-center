@@ -88,6 +88,63 @@
     });
   }
 
+  function plural(n, word) { return n + " " + (n === 1 ? word.replace(/s$/, "") : word); }
+
+  function card(title, target) {
+    var c = el("div", "acc-card");
+    if (target) {
+      var a = el("a", "acc-card-h", title);
+      a.href = "#" + target;
+      c.appendChild(a);
+    } else {
+      c.appendChild(el("div", "acc-card-h", title));
+    }
+    return c;
+  }
+
+  function renderOverview() {
+    var host = document.getElementById("acc-overview");
+    var bento = el("div", "acc-bento");
+
+    // providers always includes generic; show excludes it when first-class providers exist
+    var provs = data.providers || [];
+    var firstClass = provs.filter(function (p) { return p.id !== "generic"; });
+    var show = firstClass.length ? firstClass : provs;
+    if (show.length) {
+      var pc = card("Providers");
+      show.forEach(function (p) { pc.appendChild(el("span", "acc-chip", p.displayName)); });
+      bento.appendChild(pc);
+    }
+
+    var inv = data.inventory || {};
+    var nonEmpty = INV_ORDER.filter(function (b) { return (inv[b] || []).length; });
+    if (nonEmpty.length) {
+      var ic = card("Inventory", "inventory");
+      nonEmpty.forEach(function (b) {
+        ic.appendChild(el("div", null, plural(inv[b].length, INV_LABEL[b].toLowerCase())));
+      });
+      bento.appendChild(ic);
+    }
+
+    var todos = (data.project && data.project.openTodos) || [];
+    if (todos.length) {
+      var tc = card("Open TODOs (" + todos.length + ")", "todos");
+      todos.slice(0, 3).forEach(function (t) { tc.appendChild(el("div", null, t.text)); });
+      bento.appendChild(tc);
+    }
+
+    var docs = data.docs || {};
+    var docCount = 0;
+    Object.keys(docs).forEach(function (k) { docCount += (docs[k] || []).length; });
+    if (docCount) {
+      var dc = card("Docs", "docs");
+      dc.appendChild(el("div", null, docCount + " referenced"));
+      bento.appendChild(dc);
+    }
+
+    if (bento.children.length) host.appendChild(bento);
+  }
+
   function wireSearch() {
     var box = document.getElementById("acc-search");
     box.addEventListener("input", function () {
@@ -100,6 +157,7 @@
   }
 
   renderHead();
+  renderOverview();
   renderInventory();
   renderDocs();
   renderTodos();

@@ -25,3 +25,7 @@ footer.acc-foot { padding: 16px; color: var(--muted); font-size: 11px; }
 .acc-row a.path { display: inline-block; color: var(--muted); font-size: 11px; text-decoration: none; }
 .acc-row a.path:hover { text-decoration: underline; }
 .acc-sublabel { font-weight: 600; margin: 12px 0 4px; }
+.acc-bento { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.acc-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.acc-card-h { display: block; font-weight: 600; margin-bottom: 6px; color: var(--fg); text-decoration: none; }
+.acc-card a.acc-card-h:hover { text-decoration: underline; }
