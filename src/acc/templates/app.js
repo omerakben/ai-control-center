@@ -37,6 +37,31 @@
     return row;
   }
 
+  // Display order (deliberate; differs from _INV_BUCKETS storage order in
+  // base.py, which has skills before commands). The renderer owns its order.
+  var INV_ORDER = ["agents", "commands", "skills", "hooks", "mcpServers", "rules"];
+  var INV_LABEL = {
+    agents: "Agents", commands: "Commands", skills: "Skills",
+    hooks: "Hooks", mcpServers: "MCP servers", rules: "Rules"
+  };
+
+  function renderInventory() {
+    var host = document.getElementById("acc-inventory");
+    var inv = data.inventory || {};
+    INV_ORDER.forEach(function (bucket) {
+      var items = inv[bucket] || [];
+      if (!items.length) return;
+      host.appendChild(el("div", "acc-sublabel",
+        INV_LABEL[bucket] + " (" + items.length + ")"));
+      items.forEach(function (it) {
+        host.appendChild(itemRow({
+          provider: it.provider, typeLabel: it.typeLabel,
+          title: it.title, path: it.path, summary: it.summary
+        }));
+      });
+    });
+  }
+
   function renderHead() {
     document.getElementById("acc-title").textContent = data.project.title;
     var m = data.source;
@@ -75,6 +100,7 @@
   }
 
   renderHead();
+  renderInventory();
   renderDocs();
   renderTodos();
   wireSearch();

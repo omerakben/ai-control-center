@@ -24,3 +24,4 @@ footer.acc-foot { padding: 16px; color: var(--muted); font-size: 11px; }
 .acc-summary { color: var(--muted); margin: 2px 0; }
 .acc-row a.path { display: inline-block; color: var(--muted); font-size: 11px; text-decoration: none; }
 .acc-row a.path:hover { text-decoration: underline; }
+.acc-sublabel { font-weight: 600; margin: 12px 0 4px; }

@@ -1,0 +1,24 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - strong [ref=e3]: acc_demo_multi
+    - textbox "search" [ref=e4]:
+      - /placeholder: search…
+    - generic [ref=e5]: "stamped · digest 1218cf00a5c49f8f · vcs: none · freshness is manual"
+  - navigation [ref=e6]:
+    - link "Overview" [ref=e7] [cursor=pointer]:
+      - /url: "#overview"
+    - link "Docs" [ref=e8] [cursor=pointer]:
+      - /url: "#docs"
+    - link "TODOs" [ref=e9] [cursor=pointer]:
+      - /url: "#todos"
+  - generic [ref=e11]: Overview
+  - generic [ref=e12]:
+    - generic [ref=e13]: Docs
+    - generic [ref=e14]:
+      - generic [ref=e15]: html-dash references AGENTS.md
+      - generic [ref=e16]: My Project references CLAUDE.md
+      - generic [ref=e17]: Notes references docs/notes.md
+  - generic [ref=e18]:
+    - generic [ref=e19]: Open TODOs
+    - generic [ref=e21]: pick a framework — AGENTS.md
+  - contentinfo [ref=e22]: Generated offline by ai-control-center. Refresh with the dashboard command.

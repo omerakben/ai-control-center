@@ -39,3 +39,11 @@ def test_render_does_not_corrupt_island_with_placeholder_text():
     island = html.split('id="acc-data"', 1)[1].split("</script>", 1)[0]
     assert "__SCHEMA_VERSION__" in island
     assert "__DATA_ISLAND__" in island
+
+
+def test_template_and_app_have_inventory():
+    html = render_html(_data())
+    assert 'id="inventory"' in html
+    assert ">Inventory<" in html        # nav link
+    assert "renderInventory" in html    # app.js embedded
+    assert "function itemRow" in html
