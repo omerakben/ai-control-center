@@ -4,7 +4,7 @@ from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_d
 from ..ids import rel_posix
 from ..redaction import redact_text
 from ..markdown import render_markdown_safe
-from ..config import load_toml, safe_mcp
+from ..config import load_toml, safe_mcp, as_dict
 from .generic import _first_heading, _first_paragraph
 
 _CONFIG_FACTS = ("model", "model_reasoning_effort", "sandbox", "approval_policy")
@@ -26,7 +26,9 @@ class CodexAdapter:
         docs = empty_docs()
         toml = load_toml(ctx.root / ".codex" / "config.toml")
 
-        for name, cfg in (toml.get("mcp_servers") or {}).items():
+        # as_dict guards the `[[mcp_servers]]` array-of-tables typo, which
+        # tomllib parses to a list — iterating it directly would crash.
+        for name, cfg in as_dict(toml.get("mcp_servers")).items():
             clean = safe_mcp(cfg if isinstance(cfg, dict) else {})
             item = make_item("codex", "mcpServer", "MCP server", name,
                              ".codex/config.toml", clean.get("command") or clean.get("url") or "")

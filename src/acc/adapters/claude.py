@@ -5,7 +5,7 @@ from ..ids import rel_posix
 from ..redaction import redact_text
 from ..markdown import render_markdown_safe
 from ..frontmatter import parse_frontmatter
-from ..config import load_json, safe_mcp
+from ..config import load_json, safe_mcp, as_dict
 from .generic import _first_heading, _first_paragraph
 
 
@@ -85,10 +85,18 @@ class ClaudeAdapter:
     def _hooks(self, root: Path) -> list[dict]:
         settings = load_json(root / ".claude" / "settings.json")
         out: list[dict] = []
-        for event, entries in (settings.get("hooks") or {}).items():
+        # Guard every level: hooks may be a non-dict, an event may map to a
+        # non-list, and an entry or inner hook may be a non-dict. A hand-edited
+        # settings.json should degrade to no hooks, never crash the pipeline.
+        for event, entries in as_dict(settings.get("hooks")).items():
             for entry in entries if isinstance(entries, list) else []:
+                if not isinstance(entry, dict):
+                    continue
                 matcher = entry.get("matcher", "")
-                for h in entry.get("hooks", []):
+                inner = entry.get("hooks", [])
+                for h in inner if isinstance(inner, list) else []:
+                    if not isinstance(h, dict):
+                        continue
                     cmd = redact_text(str(h.get("command", "")))[0]
                     title = f"{event} ({matcher})" if matcher else event
                     out.append(make_item(
@@ -101,7 +109,7 @@ class ClaudeAdapter:
         # settings.json first, then .mcp.json overrides on name conflict
         for rel in (".claude/settings.json", ".mcp.json"):
             path = root / rel
-            servers = load_json(path).get("mcpServers") or {}
+            servers = as_dict(load_json(path).get("mcpServers"))
             for name, cfg in servers.items():
                 merged[name] = (rel, cfg if isinstance(cfg, dict) else {})
         out: list[dict] = []

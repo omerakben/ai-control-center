@@ -26,6 +26,17 @@ def load_toml(path: Path) -> dict:
         return {}
 
 
+def as_dict(value) -> dict:
+    """Coerce a parsed-config value to a dict before iterating it.
+
+    `load_json`/`load_toml` guard only the document root, and the `... or {}`
+    idiom guards only None/empty — a well-formed-but-wrong-shape value (a list,
+    string, or a TOML `[[mcp_servers]]` array-of-tables) is truthy and would
+    crash `.items()`. Per the design's no-crash contract, treat it as empty.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def safe_mcp(server: dict) -> dict:
     """Allowlist a single MCP server config, redacting surviving values."""
     return allowlist_config(server, MCP_ALLOWED)

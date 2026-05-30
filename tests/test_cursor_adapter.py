@@ -50,3 +50,19 @@ def test_provider_summary_shape(tmp_path):
     _, part = _normalize(tmp_path)
     assert part["provider"]["id"] == "cursor"
     assert part["provider"]["displayName"] == "Cursor"
+
+
+def test_survives_wrong_shape_mcp(tmp_path):
+    (tmp_path / ".cursor").mkdir()
+    (tmp_path / ".cursor" / "mcp.json").write_text('{"mcpServers": "not a dict"}')
+    _, part = _normalize(tmp_path)
+    assert part["inventory"]["mcpServers"] == []
+
+
+def test_inventories_nested_rule(tmp_path):
+    # rules live under .cursor/rules/** including subdirectories
+    (tmp_path / ".cursor" / "rules" / "sub").mkdir(parents=True)
+    (tmp_path / ".cursor" / "rules" / "sub" / "deep.mdc").write_text(
+        "---\ndescription: nested rule\n---\nbody")
+    _, part = _normalize(tmp_path)
+    assert any(r["path"] == ".cursor/rules/sub/deep.mdc" for r in part["inventory"]["rules"])

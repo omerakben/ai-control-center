@@ -52,3 +52,22 @@ def test_provider_summary_has_config_facts(tmp_path):
     assert prov["displayName"] == "Codex"
     assert prov["config"]["model"] == "gpt-5.5"
     assert prov["config"]["approval_policy"] == "on-request"
+
+
+def test_survives_array_of_tables_mcp(tmp_path):
+    # `[[mcp_servers]]` (array-of-tables typo) parses to a list — must not crash
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".codex" / "config.toml").write_text('[[mcp_servers]]\nname = "x"\n')
+    _, part = _normalize(tmp_path)
+    assert part["inventory"]["mcpServers"] == []
+
+
+def test_drops_mcp_env_secret(tmp_path):
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".codex" / "config.toml").write_text(
+        '[mcp_servers.db]\ncommand = "psql"\n'
+        '[mcp_servers.db.env]\nPGPASSWORD = "s3cr3tpassword"\n')
+    _, part = _normalize(tmp_path)
+    assert "s3cr3tpassword" not in str(part)
+    db = next(m for m in part["inventory"]["mcpServers"] if m["title"] == "db")
+    assert "env" not in db["config"]

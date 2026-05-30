@@ -1,3 +1,5 @@
+import json
+
 from acc.adapters.base import ScanContext
 from acc.adapters.claude import ClaudeAdapter
 from acc.scan import scan_files
@@ -63,3 +65,25 @@ def test_provider_summary_shape(tmp_path):
     assert prov["id"] == "claude"
     assert prov["displayName"] == "Claude Code"
     assert prov["detected"] is True
+
+
+def test_survives_wrong_shape_mcp_and_hooks(tmp_path):
+    # well-formed JSON of the wrong shape must degrade, not crash
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".mcp.json").write_text('{"mcpServers": ["not", "a", "dict"]}')
+    (tmp_path / ".claude" / "settings.json").write_text(
+        '{"hooks": ["bad"], "mcpServers": "nope"}')
+    _, _, part = _normalize(tmp_path)
+    assert part["inventory"]["mcpServers"] == []
+    assert part["inventory"]["hooks"] == []
+
+
+def test_hooks_skips_nonstandard_entries(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    settings = {"hooks": {"PreToolUse": [
+        "echo hi",  # a string entry — skip
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "ok"}]},
+    ]}}
+    (tmp_path / ".claude" / "settings.json").write_text(json.dumps(settings))
+    _, _, part = _normalize(tmp_path)
+    assert len(part["inventory"]["hooks"]) == 1
