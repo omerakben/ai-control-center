@@ -58,3 +58,45 @@ def test_tripwire_catches_compound_env_secret():
     data["project"]["summary"] = 'AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMIK7MDENGbValueXYZ"'
     with pytest.raises(ValueError, match="tripwire"):
         validate(data)
+
+
+def _data_with_search(rec) -> dict:
+    data = _minimal_data()
+    data["search"] = [rec]
+    return data
+
+
+def _good_record() -> dict:
+    return {"id": "i1", "type": "agent", "typeLabel": "Claude agent",
+            "title": "A", "path": "a.md", "text": "body"}
+
+
+def test_validate_accepts_good_search_record():
+    validate(_data_with_search(_good_record()))  # no exception
+
+
+def test_validate_accepts_light_record_empty_text():
+    rec = _good_record()
+    rec["text"] = ""
+    validate(_data_with_search(rec))  # no exception
+
+
+def test_validate_rejects_search_record_missing_key():
+    rec = _good_record()
+    del rec["typeLabel"]
+    with pytest.raises(ValueError, match="search"):
+        validate(_data_with_search(rec))
+
+
+def test_validate_rejects_search_record_non_string_value():
+    rec = _good_record()
+    rec["title"] = 123
+    with pytest.raises(ValueError, match="search"):
+        validate(_data_with_search(rec))
+
+
+def test_validate_rejects_unknown_search_type():
+    rec = _good_record()
+    rec["type"] = "bogus"
+    with pytest.raises(ValueError, match="search"):
+        validate(_data_with_search(rec))
