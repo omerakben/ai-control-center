@@ -269,6 +269,7 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
         for items in bucket.values():
             for it in items:
                 it.pop("_searchBody", None)
+                it.pop("_refScanBody", None)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 

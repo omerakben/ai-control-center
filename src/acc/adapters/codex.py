@@ -58,6 +58,7 @@ class CodexAdapter:
                     "path": rel,
                     "summary": _first_paragraph(clean),
                     "html": render_markdown_safe(clean),
+                    "_refScanBody": clean,
                 })
 
         facts = {k: redact_text(str(toml[k]))[0] for k in _CONFIG_FACTS if k in toml}
