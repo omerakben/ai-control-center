@@ -105,6 +105,10 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
     # Escape every author-derived plain-text display field so hostile content
     # (script tags, onerror, </script>) can never reach the data island raw.
     # The `html` field is already sanitized by render_markdown_safe — leave it.
+    # `provider`/`typeLabel`/`displayName` are NOT escaped here because they are
+    # generator-controlled constants (adapter ids and fixed labels), never
+    # author input. If a future adapter derives any of them from frontmatter,
+    # add it to the escape pass below.
     for bucket in (inv, docs):
         for items in bucket.values():
             for it in items:
