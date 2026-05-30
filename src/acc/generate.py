@@ -1,4 +1,5 @@
 import html as _html
+import os
 from pathlib import Path
 from .scan import scan_files
 from .digest import source_digest
@@ -113,6 +114,19 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
             todo["text"] = _html.escape(todo["text"])
 
 
+def _path_prefix(root: Path, out_dir: Path) -> str:
+    """Posix relative path from the dashboard's dir back to the repo root.
+
+    Normally "..", "." when out_dir == root, "../.." when nested. Returns ""
+    when the path is not expressible (e.g. a different Windows drive), in which
+    case the renderer falls back to plain-text paths instead of a broken href.
+    """
+    try:
+        return Path(os.path.relpath(root, out_dir)).as_posix()
+    except ValueError:
+        return ""
+
+
 def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
     root = root.resolve()
     all_files = scan_files(root)
@@ -164,9 +178,11 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
 
     data = {
         "schemaVersion": SCHEMA_VERSION,
-        "generator": {"name": "ai-control-center", "version": __version__, "rendererDigest": ""},
+        "generator": {"name": "ai-control-center", "version": __version__,
+                      "rendererDigest": "", "truncated": False},
         "source": {
             "repoName": root.name,
+            "pathPrefix": _path_prefix(root, out_dir),
             "dashboardPath": (
                 dashboard.relative_to(root).as_posix()
                 if dashboard.is_relative_to(root) else str(dashboard)

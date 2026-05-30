@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from pathlib import Path
 from acc.generate import generate, detect_out_dir
@@ -161,3 +162,39 @@ def test_generate_digest_ignores_stale_other_dashboard(tmp_path):
     second = generate(tmp_path, out_dir=out_dir).read_text(encoding="utf-8")
     dig = lambda h: re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
     assert dig(first) == dig(second)
+
+
+def test_pathprefix_is_dotdot_for_provider_owner(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    assert data["source"]["pathPrefix"] == ".."
+
+
+def test_pathprefix_is_dot_when_out_is_root(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path, out_dir=tmp_path))
+    assert data["source"]["pathPrefix"] == "."
+
+
+def test_pathprefix_for_nested_out_dir(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path, out_dir=tmp_path / "a" / "b"))
+    assert data["source"]["pathPrefix"] == "../.."
+
+
+def test_pathprefix_empty_when_relpath_fails(tmp_path, monkeypatch):
+    make_claude_repo(tmp_path)
+
+    def boom(*a, **k):
+        raise ValueError("different drive")
+
+    # acc.generate calls os.path.relpath, and os.path is a shared module object, so patching it here affects the generator too.
+    monkeypatch.setattr(os.path, "relpath", boom)
+    data = _island(generate(tmp_path))
+    assert data["source"]["pathPrefix"] == ""
+
+
+def test_generator_truncated_defaults_false(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is False
