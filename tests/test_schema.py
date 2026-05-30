@@ -50,3 +50,11 @@ def test_validate_runs_the_tripwire():
     data["project"]["summary"] = "secret = supersecretvalue123"
     with pytest.raises(ValueError, match="tripwire"):
         validate(data)
+
+
+def test_tripwire_catches_compound_env_secret():
+    # the tripwire must not share the keyword redactor's old compound-name blind spot
+    data = _minimal_data()
+    data["project"]["summary"] = 'AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMIK7MDENGbValueXYZ"'
+    with pytest.raises(ValueError, match="tripwire"):
+        validate(data)
