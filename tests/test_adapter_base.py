@@ -24,3 +24,17 @@ def test_empty_shapes_have_expected_buckets():
     assert set(empty_inventory()) == {"agents", "skills", "hooks", "commands", "mcpServers", "rules"}
     assert set(empty_docs()) == {"prds", "adrs", "decisions", "workflows", "references"}
     assert all(v == [] for v in empty_inventory().values())
+
+
+def test_doc_type_label_maps_buckets():
+    from acc.adapters.base import doc_type_label
+    assert doc_type_label("references") == "Reference"
+    assert doc_type_label("prds") == "PRD"
+    assert doc_type_label("adrs") == "ADR"
+    assert doc_type_label("decisions") == "Decision"
+    assert doc_type_label("workflows") == "Workflow"
+
+
+def test_doc_type_label_unknown_bucket_titlecases():
+    from acc.adapters.base import doc_type_label
+    assert doc_type_label("misc") == "Misc"
