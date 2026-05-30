@@ -226,7 +226,7 @@
   }
 
   // Append text + <mark> nodes by splitting the logical string on the query.
-  // No innerHTML, no string-built markup — every node uses textContent.
+  // No HTML strings — every node is built via textContent / createElement.
   function appendHighlighted(target, logical, qLower) {
     if (!qLower) { target.appendChild(document.createTextNode(logical)); return; }
     var hay = logical.toLowerCase();
