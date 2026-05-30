@@ -17,3 +17,14 @@ def test_dom_renders_title(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
     assert page.locator("#acc-title").inner_text() != ""
+
+
+def test_doc_path_renders_as_encoded_link(page, tmp_path):
+    # a doc with reserved chars in its name must produce a correctly encoded href
+    (tmp_path / "weird name#1.md").write_text("# Weird\n\nbody")
+    page.set_content(_html(tmp_path))
+    link = page.locator('#acc-docs a.path', has_text="weird name#1.md")
+    assert link.count() == 1
+    href = link.first.get_attribute("href")
+    assert href == "../weird%20name%231.md"  # prefix + per-segment encoding
+    assert "#1.md" not in href                # raw # would start a fragment
