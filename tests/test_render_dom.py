@@ -268,3 +268,15 @@ def test_omnibox_light_index_note(page, tmp_path):
     panel = page.locator("#acc-omnibox-results")
     assert panel.locator(".acc-omni-hit", has_text="big_0001").count() >= 1
     assert "body search is off" in panel.inner_text().lower()
+
+
+def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "re")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    assert panel.evaluate("el => getComputedStyle(el).position") == "absolute"
+    bg = page.locator("#acc-omnibox-results mark").first.evaluate(
+        "el => getComputedStyle(el).backgroundColor")
+    assert bg not in ("rgba(0, 0, 0, 0)", "transparent")
