@@ -10,7 +10,11 @@
 <body>
 <header class="acc-head">
   <strong id="acc-title">Dashboard</strong>
-  <input id="acc-search" placeholder="search…" aria-label="search">
+  <div class="acc-omnibox-wrap">
+    <input id="acc-omnibox" placeholder="Find anything…  ( / )" aria-label="Find across everything" autocomplete="off">
+    <div id="acc-omnibox-results" class="acc-omnibox-results" hidden></div>
+  </div>
+  <input id="acc-search" placeholder="filter this view…" aria-label="Filter rows in view">
   <span class="acc-meta" id="acc-meta"></span>
 </header>
 <nav class="acc-nav">

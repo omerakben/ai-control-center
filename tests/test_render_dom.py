@@ -88,3 +88,14 @@ def test_no_banner_when_full(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
     assert page.locator("#acc-banner").inner_text().strip() == ""
+
+
+def test_omnibox_and_filter_inputs_distinct(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    omni = page.locator("#acc-omnibox")
+    filt = page.locator("#acc-search")
+    assert omni.count() == 1 and filt.count() == 1
+    assert "find" in (omni.get_attribute("aria-label") or "").lower()
+    assert "filter" in (filt.get_attribute("aria-label") or "").lower()
+    assert page.locator("#acc-omnibox-results").count() == 1
