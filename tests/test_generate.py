@@ -258,3 +258,53 @@ def test_escape_pass_caps_body_slice_multibyte_safe():
     # "héllo " has no HTML-special chars so html.escape is a no-op here; escape
     # correctness on hostile input is covered at the island level in a later task.
     assert slice_ == long_body[:_SEARCH_BODY_CHARS]    # clean codepoint cut
+
+
+def test_build_search_record_shape_and_doc_type_label(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    recs = data["search"]
+    assert recs, "expected search records"
+    required = {"id", "type", "typeLabel", "title", "path", "text"}
+    for r in recs:
+        assert required <= set(r.keys())
+        assert all(isinstance(r[k], str) for k in required)
+    agent = next(r for r in recs if r["typeLabel"] == "Claude agent")
+    assert agent["type"] == "agent"
+    doc = next(r for r in recs if r["type"] == "doc")
+    assert doc["typeLabel"] in {"Reference", "PRD", "ADR", "Decision", "Workflow"}
+
+
+def test_build_search_appends_escaped_body_slice():
+    from acc.generate import _build_search
+    inv = {"agents": [{"id": "i1", "type": "agent", "typeLabel": "Claude agent",
+                       "title": "A", "path": "a.md", "summary": "sum",
+                       "_searchBody": "BODYSLICE"}]}
+    docs = {"references": []}
+    recs = _build_search(inv, docs)
+    assert recs[0]["text"] == "sum BODYSLICE"
+
+
+def test_build_search_escapes_hostile_slice_in_island(tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "x.md").write_text(
+        '---\nname: ok\ndescription: "</script><img onerror=alert(1)>"\n---\n')
+    data = _island(generate(tmp_path))
+    blob = " ".join(r["text"] for r in data["search"])
+    assert "onerror=alert(1)>" not in blob
+    assert "&lt;img" in blob
+
+
+def test_build_search_stays_sorted(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    recs = data["search"]
+    keys = [(r["path"], r["title"], r["id"]) for r in recs]
+    assert keys == sorted(keys)
+
+
+def test_private_search_body_key_not_in_island(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    html = generate(tmp_path).read_text(encoding="utf-8")
+    assert "_searchBody" not in html

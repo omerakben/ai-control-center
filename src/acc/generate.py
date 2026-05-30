@@ -8,7 +8,7 @@ from .digest import source_digest
 from .schema import SCHEMA_VERSION, validate
 from .render import render_html
 from .ids import rel_posix
-from .adapters.base import ScanContext, empty_inventory, empty_docs
+from .adapters.base import ScanContext, empty_inventory, empty_docs, doc_type_label
 from .adapters.generic import GenericAdapter, harvest_todos
 from .adapters.claude import ClaudeAdapter
 from .adapters.codex import CodexAdapter
@@ -99,13 +99,33 @@ def _merge_parts(parts: list[dict]) -> tuple[dict, dict]:
 
 def _build_search(inv: dict, docs: dict) -> list[dict]:
     records: list[dict] = []
-    for bucket in (docs, inv):
-        for items in bucket.values():
-            for it in items:
-                records.append({"id": it["id"], "title": it["title"],
-                                "path": it["path"], "text": it.get("summary", "")})
+    # Docs lack type/typeLabel (built by a separate adapter path keyed only by
+    # bucket); synthesize a fixed type="doc" + a bucket-derived typeLabel so doc
+    # hits group correctly instead of landing in an undefined group. Inventory
+    # items already carry both via make_item.
+    for bucket_key, items in docs.items():
+        label = doc_type_label(bucket_key)
+        for it in items:
+            records.append(_search_record(it, "doc", label))
+    for items in inv.values():
+        for it in items:
+            records.append(_search_record(it, it.get("type", ""), it.get("typeLabel", "")))
+    # Explicit sort is load-bearing: render.py's json.dumps(sort_keys=True) sorts
+    # dict keys but NOT list order, so determinism depends on this.
     records.sort(key=lambda r: (r["path"], r["title"], r["id"]))
     return records
+
+
+def _search_record(it: dict, type_: str, type_label: str) -> dict:
+    # text = escaped summary + escaped capped body slice (both escaped on the
+    # same pass in _escape_text_fields, preserving the "search reads escaped
+    # fields" contract). type/type_label are generator-controlled constants,
+    # not author input, so they are not escaped.
+    summary = it.get("summary", "")
+    body = it.get("_searchBody", "")
+    text = (summary + " " + body).strip() if body and body != summary else summary
+    return {"id": it["id"], "type": type_, "typeLabel": type_label,
+            "title": it["title"], "path": it["path"], "text": text}
 
 
 def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
@@ -229,6 +249,11 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
     inv, docs = _merge_parts(parts)
     _escape_text_fields(inv, docs, gpart["project"])  # escape titles/summaries for the island
     search = _build_search(inv, docs)   # search reads the escaped fields (Phase 1 contract)
+    # Drop the private slice key so it never reaches the serialized island.
+    for bucket in (inv, docs):
+        for items in bucket.values():
+            for it in items:
+                it.pop("_searchBody", None)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
