@@ -10,6 +10,24 @@
     return e;
   }
 
+  // Decode the five entities html.escape (Python) produces. Applied ONLY at
+  // textContent display and when building the omnibox match key, so search and
+  // display see logical text (AT&T, not AT&amp;T) without an HTML sink — the
+  // decoded value still reaches the DOM via textContent and stays inert.
+  // Order matters: decode &amp; LAST so "&amp;lt;" does not double-decode.
+  function htmlUnescape(s) {
+    if (s == null) return "";
+    return String(s)
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&");
+  }
+  // expose for DOM tests; harmless in production (no behavior, just a handle)
+  window.__accHtmlUnescape = htmlUnescape;
+
   function encodedRelHref(prefix, path) {
     var raw = (prefix === "." ? path : prefix + "/" + path);
     return raw.split("/").map(function (seg) {
@@ -19,12 +37,13 @@
 
   function itemRow(opts) {
     var row = el("div", "acc-row acc-item");
+    if (opts.id) row.dataset.id = opts.id;
     var head = el("div", "acc-rowhead");
     if (opts.provider) head.appendChild(el("span", "acc-chip", opts.provider));
     if (opts.typeLabel) head.appendChild(el("span", "badge", opts.typeLabel));
-    head.appendChild(el("span", "acc-itemtitle", opts.title));
+    head.appendChild(el("span", "acc-itemtitle", htmlUnescape(opts.title)));
     row.appendChild(head);
-    if (opts.summary) row.appendChild(el("div", "acc-summary", opts.summary));
+    if (opts.summary) row.appendChild(el("div", "acc-summary", htmlUnescape(opts.summary)));
     if (pathPrefix) {
       var a = el("a", "path", opts.path);
       a.href = encodedRelHref(pathPrefix, opts.path);
@@ -33,7 +52,8 @@
       row.appendChild(el("span", "path", opts.path));
     }
     row.dataset.search =
-      (opts.title + " " + opts.path + " " + (opts.summary || "")).toLowerCase();
+      (htmlUnescape(opts.title) + " " + opts.path + " " +
+       htmlUnescape(opts.summary || "")).toLowerCase();
     return row;
   }
 
@@ -55,6 +75,7 @@
         INV_LABEL[bucket] + " (" + items.length + ")"));
       items.forEach(function (it) {
         host.appendChild(itemRow({
+          id: it.id,
           provider: it.provider, typeLabel: it.typeLabel,
           title: it.title, path: it.path, summary: it.summary
         }));
@@ -75,6 +96,7 @@
     Object.keys(groups).sort().forEach(function (g) {
       groups[g].forEach(function (doc) {
         host.appendChild(itemRow({
+          id: doc.id,
           typeLabel: g, title: doc.title, path: doc.path, summary: doc.summary
         }));
       });
@@ -84,7 +106,7 @@
   function renderTodos() {
     var host = document.getElementById("acc-todos");
     (data.project.openTodos || []).forEach(function (t) {
-      host.appendChild(itemRow({ title: t.text, path: t.path }));
+      host.appendChild(itemRow({ id: t.id, title: t.text, path: t.path }));
     });
   }
 

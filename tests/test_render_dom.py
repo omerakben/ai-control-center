@@ -90,6 +90,24 @@ def test_no_banner_when_full(page, tmp_path):
     assert page.locator("#acc-banner").inner_text().strip() == ""
 
 
+def test_rows_carry_dataset_id(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    rows = page.locator(".acc-item")
+    n = rows.count()
+    assert n > 0
+    for i in range(n):
+        assert rows.nth(i).get_attribute("data-id")
+
+
+def test_htmlunescape_decodes_entities(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    decoded = page.evaluate(
+        "() => window.__accHtmlUnescape('AT&amp;T &lt;b&gt; &quot;q&quot; &#x27;s')")
+    assert decoded == "AT&T <b> \"q\" 's"
+
+
 def test_omnibox_and_filter_inputs_distinct(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
