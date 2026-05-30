@@ -51,3 +51,15 @@ def as_dict(value) -> dict:
 def safe_mcp(server: dict) -> dict:
     """Allowlist a single MCP server config, redacting surviving values."""
     return allowlist_config(server, MCP_ALLOWED)
+
+
+def mcp_summary(clean: dict) -> str:
+    """One-line MCP summary: the command, else the url, else empty.
+
+    A malformed config can make `command`/`url` a non-string (a list of argv
+    parts, a dict). Display fields must stay strings — `html.escape` runs on
+    them downstream — so coerce any non-string to empty, the same fail-closed
+    posture `as_dict` takes for wrong-shape containers.
+    """
+    value = clean.get("command") or clean.get("url") or ""
+    return value if isinstance(value, str) else ""

@@ -5,7 +5,7 @@ from ..ids import rel_posix
 from ..redaction import redact_text
 from ..markdown import render_markdown_safe
 from ..frontmatter import parse_frontmatter
-from ..config import load_json, safe_mcp, as_dict
+from ..config import load_json, safe_mcp, mcp_summary, as_dict
 from .generic import _first_heading, _first_paragraph
 
 
@@ -137,8 +137,8 @@ class ClaudeAdapter:
         out: list[dict] = []
         for name, (rel, cfg) in merged.items():
             clean = safe_mcp(cfg)
-            summary = clean.get("command") or clean.get("url") or ""
-            item = make_item("claude", "mcpServer", "MCP server", name, rel, summary)
+            item = make_item("claude", "mcpServer", "MCP server", name, rel,
+                             mcp_summary(clean))
             item["config"] = clean
             out.append(item)
         return out

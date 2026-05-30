@@ -102,7 +102,11 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
             for it in items:
                 for field in ("title", "summary"):
                     if field in it:
-                        it[field] = _html.escape(it[field])
+                        # display fields are strings by contract; coerce any
+                        # wrong-shape leaf from a malformed config so escape
+                        # (and the renderer) never sees a list/dict here
+                        value = it[field]
+                        it[field] = _html.escape(value if isinstance(value, str) else "")
     project["title"] = _html.escape(project.get("title", ""))
     for todo in project.get("openTodos", []):
         if "text" in todo:

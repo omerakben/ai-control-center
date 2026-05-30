@@ -1,6 +1,6 @@
 import json
 import logging
-from acc.config import load_json, load_toml, safe_mcp, MCP_ALLOWED
+from acc.config import load_json, load_toml, safe_mcp, mcp_summary, MCP_ALLOWED
 
 
 def test_load_json_reads_object(tmp_path):
@@ -71,3 +71,16 @@ def test_safe_mcp_keeps_allowlisted_drops_env():
 def test_safe_mcp_redacts_credential_url():
     clean = safe_mcp({"url": "https://user:p4ssw0rd@h/x"})
     assert "p4ssw0rd" not in str(clean)
+
+
+def test_mcp_summary_prefers_command_then_url():
+    assert mcp_summary({"command": "npx", "url": "https://h"}) == "npx"
+    assert mcp_summary({"url": "https://h"}) == "https://h"
+    assert mcp_summary({}) == ""
+
+
+def test_mcp_summary_coerces_nonstring_to_empty():
+    # malformed configs can make command/url a list or dict; a display field
+    # must stay a string (html.escape is called on it downstream)
+    assert mcp_summary({"command": ["node", "server.js"]}) == ""
+    assert mcp_summary({"url": {"weird": "shape"}}) == ""

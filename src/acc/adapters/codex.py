@@ -1,10 +1,8 @@
-from pathlib import Path
-
 from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs
 from ..ids import rel_posix
 from ..redaction import redact_text
 from ..markdown import render_markdown_safe
-from ..config import load_toml, safe_mcp, as_dict
+from ..config import load_toml, safe_mcp, mcp_summary, as_dict
 from .generic import _first_heading, _first_paragraph
 
 _CONFIG_FACTS = ("model", "model_reasoning_effort", "sandbox", "approval_policy")
@@ -31,7 +29,7 @@ class CodexAdapter:
         for name, cfg in as_dict(toml.get("mcp_servers")).items():
             clean = safe_mcp(cfg if isinstance(cfg, dict) else {})
             item = make_item("codex", "mcpServer", "MCP server", name,
-                             ".codex/config.toml", clean.get("command") or clean.get("url") or "")
+                             ".codex/config.toml", mcp_summary(clean))
             item["config"] = clean
             inv["mcpServers"].append(item)
 

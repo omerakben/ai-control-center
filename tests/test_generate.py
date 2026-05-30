@@ -112,6 +112,20 @@ def test_generate_preserves_provider_doc_todos(tmp_path):
     assert "already done" not in todos  # checked items are not open TODOs
 
 
+def test_generate_survives_list_valued_mcp_command(tmp_path):
+    # valid JSON, wrong leaf shape: `command` is a list, not a string. It must
+    # degrade to an empty summary, not crash generate() when display fields are
+    # html-escaped (a list has no .replace). Mirrors the no-crash contract that
+    # test_survives_wrong_shape_mcp_and_hooks holds for container shapes.
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n")
+    (tmp_path / ".mcp.json").write_text(
+        '{"mcpServers": {"weird": {"command": ["node", "server.js"], "type": "stdio"}}}')
+    data = _island(generate(tmp_path))
+    weird = next(m for m in data["inventory"]["mcpServers"] if m["title"] == "weird")
+    assert weird["summary"] == ""
+
+
 def test_generate_drops_mcp_env_secret(tmp_path):
     make_claude_repo(tmp_path)
     out = generate(tmp_path)

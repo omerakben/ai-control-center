@@ -2,7 +2,7 @@ from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_d
 from ..ids import rel_posix
 from ..redaction import redact_text
 from ..frontmatter import parse_frontmatter
-from ..config import load_json, safe_mcp, as_dict
+from ..config import load_json, safe_mcp, mcp_summary, as_dict
 
 
 class CursorAdapter:
@@ -41,7 +41,7 @@ class CursorAdapter:
         for name, cfg in servers.items():
             clean = safe_mcp(cfg if isinstance(cfg, dict) else {})
             item = make_item("cursor", "mcpServer", "MCP server", name,
-                             ".cursor/mcp.json", clean.get("command") or clean.get("url") or "")
+                             ".cursor/mcp.json", mcp_summary(clean))
             item["config"] = clean
             inv["mcpServers"].append(item)
 
