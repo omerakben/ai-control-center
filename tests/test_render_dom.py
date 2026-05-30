@@ -332,3 +332,12 @@ def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
     bg = page.locator("#acc-omnibox-results mark").first.evaluate(
         "el => getComputedStyle(el).backgroundColor")
     assert bg not in ("rgba(0, 0, 0, 0)", "transparent")
+
+
+def test_degraded_mode_keeps_declares_and_renders(page, tmp_path):
+    # a repo large enough to trip the 2 MB truncate budget; declares edges are
+    # bounded, so the Cross-references view still renders its source groups.
+    make_multi_provider_repo(tmp_path)
+    make_large_repo(tmp_path, 200)
+    page.set_content(_html(tmp_path))
+    assert page.locator("#acc-crossref .acc-xref-source").count() >= 1

@@ -119,3 +119,26 @@ def test_generate_populates_relationships_and_drops_private_fields(tmp_path):
     assert kinds <= {"reference", "declares"}
     assert any(e["type"] == "reference" and e["evidence"] == ".claude/agents/reviewer.md"
                for e in data["relationships"])
+
+
+def test_redaction_drops_keyword_prefixed_path(tmp_path):
+    # leak.md is the ONLY mention of reviewer.md, and it sits behind a secret
+    # keyword, so redact_text removes the path before the scan -> no edge.
+    make_claude_repo(tmp_path)
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    (tmp_path / "docs" / "leak.md").write_text(
+        "# Leak\n\ntoken: .claude/agents/reviewer.md")
+    data = _island(generate(tmp_path).read_text(encoding="utf-8"))
+    assert not any(e["type"] == "reference" and e["evidence"] == ".claude/agents/reviewer.md"
+                   for e in data["relationships"])
+
+
+def test_config_path_not_a_reference_target(tmp_path):
+    make_codex_repo(tmp_path)  # single mcpServer -> .codex/config.toml is a unique path
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    (tmp_path / "docs" / "ref.md").write_text("# Ref\n\nconfigured in .codex/config.toml here")
+    data = _island(generate(tmp_path).read_text(encoding="utf-8"))
+    assert not any(e["type"] == "reference" and e["evidence"] == ".codex/config.toml"
+                   for e in data["relationships"])
+    assert any(e["type"] == "declares" and e["evidence"] == ".codex/config.toml"
+               for e in data["relationships"])
