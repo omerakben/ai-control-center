@@ -1,5 +1,6 @@
 import json
 
+from .ids import stable_id
 from .redaction import find_secrets
 
 SCHEMA_VERSION = "1.0"
@@ -28,6 +29,31 @@ def _validate_search(records: list) -> None:
                 raise ValueError(f"search[{i}].{key} must be a string")
         if rec["type"] not in _KNOWN_SEARCH_TYPES:
             raise ValueError(f"search[{i}] unknown type: {rec['type']!r}")
+
+
+_REL_TYPES = {"reference", "declares"}
+_REL_KEYS = ("from", "to", "type", "evidence")
+
+
+def _validate_relationships(edges, item_ids: set, doc_ids: set, config_node_ids: set) -> None:
+    if not isinstance(edges, list):
+        raise ValueError("relationships must be a list")
+    for i, e in enumerate(edges):
+        if not isinstance(e, dict):
+            raise ValueError(f"relationships[{i}] is not an object")
+        for key in _REL_KEYS:
+            if key not in e:
+                raise ValueError(f"relationships[{i}] missing key: {key!r}")
+            if not isinstance(e[key], str):
+                raise ValueError(f"relationships[{i}].{key} must be a string")
+        if e["type"] not in _REL_TYPES:
+            raise ValueError(f"relationships[{i}] unknown type: {e['type']!r}")
+        if e["to"] not in item_ids:
+            raise ValueError(f"relationships[{i}] dangling 'to': {e['to']!r}")
+        if e["type"] == "reference" and e["from"] not in doc_ids:
+            raise ValueError(f"relationships[{i}] reference 'from' not a doc: {e['from']!r}")
+        if e["type"] == "declares" and e["from"] not in config_node_ids:
+            raise ValueError(f"relationships[{i}] declares 'from' not a config node: {e['from']!r}")
 
 
 def canonical_json(data: dict) -> str:
@@ -69,4 +95,12 @@ def validate(data: dict) -> None:
     if data["schemaVersion"] != SCHEMA_VERSION:
         raise ValueError(f"unexpected schemaVersion: {data['schemaVersion']!r}")
     _validate_search(data["search"])
+    inv = data["inventory"]
+    item_ids = {it["id"] for items in inv.values() for it in items}
+    doc_ids = {d["id"] for bucket in data["docs"].values() for d in bucket}
+    config_node_ids = {
+        stable_id("config", "configFile", it["path"], "")
+        for kind in ("mcpServers", "hooks") for it in inv.get(kind, [])
+    }
+    _validate_relationships(data["relationships"], item_ids, doc_ids, config_node_ids)
     assert_no_secrets(data)
