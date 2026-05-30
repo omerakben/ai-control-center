@@ -132,3 +132,139 @@ def test_jump_unknown_id_does_not_throw(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
     assert page.evaluate("() => { window.__accJump('nope_no_row'); return true; }") is True
+
+
+def test_omnibox_groups_hits_with_counts(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "re")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    assert panel.is_visible()
+    groups = panel.locator(".acc-omni-group")
+    assert groups.count() >= 1
+    head = groups.first.locator(".acc-omni-grouphead")
+    assert head.count() == 1
+    import re as _re
+    assert _re.search(r"\(\d+\)", head.inner_text())
+    assert groups.first.locator(".acc-omni-hit").count() >= 1
+
+
+def test_omnibox_matches_inventory_and_docs(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "notes")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    assert panel.locator(".acc-omni-group", has_text="Reference").count() == 1
+
+
+def test_omnibox_highlights_with_mark_not_innerhtml(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "review")
+    page.wait_for_timeout(120)
+    mark = page.locator("#acc-omnibox-results mark")
+    assert mark.count() >= 1
+    assert mark.first.inner_text().lower() == "review"
+
+
+def test_omnibox_caps_group_with_more_line(page, tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    for i in range(12):
+        (docs / ("alpha_%02d.md" % i)).write_text("# Alpha %d\n\nbody" % i)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "alpha")
+    page.wait_for_timeout(120)
+    grp = page.locator("#acc-omnibox-results .acc-omni-group", has_text="Reference")
+    assert grp.locator(".acc-omni-hit").count() == 8
+    assert grp.locator(".acc-omni-more").count() == 1
+    import re as _re
+    assert _re.search(r"\+\s*\d+\s+more", grp.locator(".acc-omni-more").inner_text())
+
+
+def test_omnibox_slash_focus_and_esc_close(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.locator("body").click()
+    page.keyboard.press("/")
+    assert page.evaluate("() => document.activeElement.id") == "acc-omnibox"
+    page.fill("#acc-omnibox", "review")
+    page.wait_for_timeout(120)
+    assert page.locator("#acc-omnibox-results").is_visible()
+    page.keyboard.press("Escape")
+    assert page.locator("#acc-omnibox-results").is_hidden()
+    assert page.input_value("#acc-omnibox") == ""
+
+
+def test_omnibox_keyboard_nav_and_enter_jumps(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "reviewer")
+    page.wait_for_timeout(120)
+    page.locator("#acc-omnibox").press("ArrowDown")
+    assert page.locator("#acc-omnibox-results .acc-omni-hit.acc-omni-active").count() == 1
+    page.locator("#acc-omnibox").press("Enter")
+    flashed = page.locator(".acc-item.acc-flash")
+    assert flashed.count() == 1
+    assert "reviewer" in flashed.inner_text().lower()
+
+
+def test_omnibox_no_hits_message(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "zzzznotathing")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    assert panel.is_visible()
+    assert "no matches" in panel.inner_text().lower()
+
+
+def test_omnibox_empty_query_hides_panel(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "review")
+    page.wait_for_timeout(120)
+    page.fill("#acc-omnibox", "")
+    page.wait_for_timeout(120)
+    assert page.locator("#acc-omnibox-results").is_hidden()
+
+
+def test_omnibox_at_and_t_logical_match_and_display(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "att.md").write_text('---\nname: "AT&T"\ndescription: telecom\n---\n')
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "at&t")
+    page.wait_for_timeout(120)
+    hit = page.locator("#acc-omnibox-results .acc-omni-hit", has_text="AT&T")
+    assert hit.count() == 1
+    assert "&amp;" not in hit.first.inner_text()
+
+
+def test_omnibox_hostile_body_is_inert(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "evil.md").write_text(
+        '---\nname: pwn\ndescription: "</script><img src=x onerror=window.__pwned=1>"\n---\n')
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "pwn")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    assert panel.locator("img").count() == 0
+    assert page.evaluate("() => window.__pwned") is None
+
+
+def test_omnibox_light_index_note(page, tmp_path):
+    # 150 big docs exceed the 2 MB budget -> summary-only truncation -> light
+    # index (every search record's body text is blanked). make_large_repo only
+    # yields docs titled "Doc N" at docs/big_NNNN.md, so we query a unique path
+    # fragment; names+paths stay searchable while the body-off note is shown.
+    make_large_repo(tmp_path, 150)
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "big_0001")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    assert panel.locator(".acc-omni-hit", has_text="big_0001").count() >= 1
+    assert "body search is off" in panel.inner_text().lower()
