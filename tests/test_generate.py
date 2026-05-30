@@ -255,4 +255,6 @@ def test_escape_pass_caps_body_slice_multibyte_safe():
     _escape_text_fields(inv, docs, project)
     slice_ = inv["agents"][0]["_searchBody"]
     assert len(slice_) <= _SEARCH_BODY_CHARS          # char-capped
+    # "héllo " has no HTML-special chars so html.escape is a no-op here; escape
+    # correctness on hostile input is covered at the island level in a later task.
     assert slice_ == long_body[:_SEARCH_BODY_CHARS]    # clean codepoint cut

@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 _WARN_BYTES = 1_000_000
 _TRUNCATE_BYTES = 2_000_000
 # Cap on the per-item body slice appended to each search record's `text`.
-# Budget math vs _WARN_BYTES (1 MB): at ~500 indexable items, 500 * 200 =
-# 100 KB pre-escape — an order of magnitude under the warn line, so the slice
-# does not threaten the size budget. _reduce_for_size is the safety valve above
-# it (it drops the slice entirely). str slicing is codepoint-based, so a char
-# cap cuts cleanly on multibyte boundaries.
+# Budget math (pre-escape): at ~500 indexable items, 500 * 200 = 100 KB.
+# Post-escape worst case is ~5x (& -> &amp;), so ~500 KB at 500 items — still
+# under the _WARN_BYTES (1 MB) line. _reduce_for_size drops the slice entirely
+# above the budget, so it is the real safety valve. str slicing is codepoint-
+# based, so a char cap cuts cleanly on multibyte boundaries.
 _SEARCH_BODY_CHARS = 200
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
@@ -132,6 +132,10 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                 # adapter carries one, else the (now-escaped) summary. char-cap the
                 # RAW source before escaping so the visible length, not the
                 # entity-expanded one, is what _SEARCH_BODY_CHARS bounds.
+                # `_rawBody` is the documented private override: an adapter may set
+                # it on an item to make the search slice come from full body text
+                # instead of the summary. No adapter sets it today (items fall back
+                # to the escaped summary); the branch is live plumbing for Phase 4b+.
                 raw = it.get("_rawBody")
                 if isinstance(raw, str) and raw:
                     it["_searchBody"] = _html.escape(raw[:_SEARCH_BODY_CHARS])
