@@ -142,3 +142,12 @@ def test_config_path_not_a_reference_target(tmp_path):
                    for e in data["relationships"])
     assert any(e["type"] == "declares" and e["evidence"] == ".codex/config.toml"
                for e in data["relationships"])
+
+
+def test_relationships_byte_identical_across_runs(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "links.md").write_text("# L\n\n.claude/agents/reviewer.md")
+    first = generate(tmp_path).read_text(encoding="utf-8")
+    second = generate(tmp_path).read_text(encoding="utf-8")
+    assert _island(first)["relationships"] == _island(second)["relationships"]
+    assert first == second
