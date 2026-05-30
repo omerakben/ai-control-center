@@ -1,5 +1,7 @@
+from acc.generate import generate
 from acc.render import render_html
 from acc.schema import SCHEMA_VERSION
+from tests.builders import make_multi_provider_repo
 
 
 def _data():
@@ -47,3 +49,11 @@ def test_template_and_app_have_inventory():
     assert ">Inventory<" in html        # nav link
     assert "renderInventory" in html    # app.js embedded
     assert "function itemRow" in html
+
+
+def test_template_has_crossref_section_and_nav(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    html = generate(tmp_path).read_text(encoding="utf-8")
+    assert 'id="crossref"' in html
+    assert 'id="acc-crossref"' in html
+    assert '<a href="#crossref">Cross-references</a>' in html
