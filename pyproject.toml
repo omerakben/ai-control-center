@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-control-center"
+version = "0.1.0"
+description = "Self-contained HTML control center generated from a repo's AI markdown"
+requires-python = ">=3.12"
+
+[project.scripts]
+acc = "acc.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+acc = ["templates/*.tmpl", "templates/*.css", "templates/*.js"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
