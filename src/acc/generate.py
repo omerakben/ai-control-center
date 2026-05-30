@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 _WARN_BYTES = 1_000_000
 _TRUNCATE_BYTES = 2_000_000
+# Degraded mode keeps all `declares` edges (bounded by MCP+hook count) but caps
+# `reference` edges, which are unbounded in the worst case, to a deterministic prefix.
+_MAX_DEGRADED_REFERENCE_EDGES = 200
 # Cap on the per-item body slice appended to each search record's `text`.
 # Budget math (pre-escape): at ~500 indexable items, 500 * 200 = 100 KB.
 # Post-escape worst case is ~5x (& -> &amp;), so ~500 KB at 500 items — still
@@ -280,6 +283,15 @@ def _reduce_for_size(data: dict) -> dict:
          "title": r["title"], "path": r["path"], "text": ""}
         for r in reduced["search"]
     ]
+    if "relationships" in reduced:
+        declares = [e for e in reduced["relationships"] if e["type"] == "declares"]
+        refs = [e for e in reduced["relationships"] if e["type"] == "reference"]
+        if len(refs) > _MAX_DEGRADED_REFERENCE_EDGES:
+            logger.warning("degraded mode: capping %d reference edges to %d",
+                           len(refs), _MAX_DEGRADED_REFERENCE_EDGES)
+            refs = refs[:_MAX_DEGRADED_REFERENCE_EDGES]
+        reduced["relationships"] = sorted(
+            declares + refs, key=lambda e: (e["from"], e["to"], e["type"]))
     reduced["generator"]["truncated"] = True
     return reduced
 
