@@ -9,6 +9,26 @@ _REQUIRED_TOP = {
     "project", "inventory", "docs", "relationships", "search",
 }
 
+_SEARCH_KEYS = ("id", "type", "typeLabel", "title", "path", "text")
+_KNOWN_SEARCH_TYPES = {
+    "agent", "skill", "hook", "command", "mcpServer", "rule", "doc", "todo",
+}
+
+
+def _validate_search(records: list) -> None:
+    if not isinstance(records, list):
+        raise ValueError("search must be a list")
+    for i, rec in enumerate(records):
+        if not isinstance(rec, dict):
+            raise ValueError(f"search[{i}] is not an object")
+        for key in _SEARCH_KEYS:
+            if key not in rec:
+                raise ValueError(f"search[{i}] missing key: {key!r}")
+            if not isinstance(rec[key], str):
+                raise ValueError(f"search[{i}].{key} must be a string")
+        if rec["type"] not in _KNOWN_SEARCH_TYPES:
+            raise ValueError(f"search[{i}] unknown type: {rec['type']!r}")
+
 
 def canonical_json(data: dict) -> str:
     return json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
@@ -48,4 +68,5 @@ def validate(data: dict) -> None:
         raise ValueError(f"missing required keys: {sorted(missing)}")
     if data["schemaVersion"] != SCHEMA_VERSION:
         raise ValueError(f"unexpected schemaVersion: {data['schemaVersion']!r}")
+    _validate_search(data["search"])
     assert_no_secrets(data)

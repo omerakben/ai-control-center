@@ -69,3 +69,15 @@ def test_generic_skips_unreadable_file(tmp_path):
     ctx = ScanContext(root=tmp_path, files=[real, ghost])
     part = GenericAdapter().normalize(ctx, GenericAdapter().detect(ctx)[0])
     assert [d["path"] for d in part["docs"]["references"]] == ["ok.md"]
+
+
+def test_extract_todos_carry_stable_id():
+    from acc.adapters.generic import _extract_todos
+    todos = _extract_todos("- [ ] first thing\n- [ ] second thing\n", "PLAN.md")
+    assert len(todos) == 2
+    for t in todos:
+        assert len(t["id"]) == 12
+        assert set(t.keys()) == {"id", "text", "path"}
+    # deterministic: same input -> same id
+    again = _extract_todos("- [ ] first thing\n", "PLAN.md")
+    assert again[0]["id"] == todos[0]["id"]

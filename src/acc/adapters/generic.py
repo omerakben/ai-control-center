@@ -53,10 +53,19 @@ def _first_paragraph(text: str) -> str:
 
 
 def _extract_todos(text: str, rel: str) -> list[dict]:
-    """Open-checkbox (`- [ ]`) lines from already-redacted markdown."""
-    return [{"text": m.group(1).strip(), "path": rel}
-            for line in text.splitlines()
-            if (m := _TODO.match(line))]
+    """Open-checkbox (`- [ ]`) lines from already-redacted markdown.
+
+    Each TODO carries a stable_id so the omnibox can jump to its rendered row,
+    matching the id contract every inventory/doc item already has.
+    """
+    out: list[dict] = []
+    for line in text.splitlines():
+        m = _TODO.match(line)
+        if m:
+            todo_text = m.group(1).strip()
+            out.append({"id": stable_id("generic", "todo", rel, todo_text),
+                        "text": todo_text, "path": rel})
+    return out
 
 
 def harvest_todos(files: list[Path], root: Path) -> list[dict]:

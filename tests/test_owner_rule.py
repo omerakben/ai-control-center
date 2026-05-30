@@ -1,6 +1,6 @@
 import pytest
 from acc.generate import resolve_owner, detect_providers, OwnerAmbiguousError
-from tests.builders import make_claude_repo, make_codex_repo, make_multi_provider_repo
+from tests.builders import make_codex_repo, make_multi_provider_repo
 
 
 def test_detect_providers_lists_present(tmp_path):

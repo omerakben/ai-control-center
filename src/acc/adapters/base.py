@@ -38,6 +38,27 @@ def empty_docs() -> dict:
     return {k: [] for k in _DOC_BUCKETS}
 
 
+# Human group headings for the doc buckets. Generator-controlled constants
+# (never author input), so they are not html-escaped — same convention as the
+# inventory typeLabel set by make_item.
+_DOC_TYPE_LABELS = {
+    "prds": "PRD",
+    "adrs": "ADR",
+    "decisions": "Decision",
+    "workflows": "Workflow",
+    "references": "Reference",
+}
+
+
+def doc_type_label(bucket: str) -> str:
+    """Map a doc bucket key to its human group heading.
+
+    Unknown buckets fall back to a title-cased key so a future bucket still
+    gets a non-empty, deterministic label instead of an undefined group.
+    """
+    return _DOC_TYPE_LABELS.get(bucket, bucket.title())
+
+
 def make_item(provider: str, kind: str, type_label: str,
               title: str, path: str, summary: str) -> dict:
     return {

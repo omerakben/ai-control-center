@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import re
-from pathlib import Path
 from acc.generate import generate, detect_out_dir
 from tests.builders import make_multi_provider_repo, make_claude_repo, make_codex_repo, make_large_repo
 
@@ -161,7 +160,10 @@ def test_generate_digest_ignores_stale_other_dashboard(tmp_path):
     (tmp_path / ".claude").mkdir()
     (tmp_path / ".claude" / "dashboard.html").write_text("<stale>" * 100)
     second = generate(tmp_path, out_dir=out_dir).read_text(encoding="utf-8")
-    dig = lambda h: re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
+
+    def dig(h):
+        return re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
+
     assert dig(first) == dig(second)
 
 
@@ -206,7 +208,7 @@ def test_over_2mb_truncates_to_summary_only(tmp_path):
     make_large_repo(tmp_path, 150)    # bulk docs to exceed 2 MB
     data = _island(generate(tmp_path))
     assert data["generator"]["truncated"] is True
-    assert data["search"] == []
+    assert data["search"] and all(r["text"] == "" for r in data["search"])
     for d in data["docs"]["references"]:
         assert d["summary"] == "" and d["html"] == ""
         assert "id" in d and "title" in d and "path" in d  # shape intact
@@ -230,3 +232,130 @@ def test_small_repo_not_truncated(tmp_path):
     make_claude_repo(tmp_path)
     data = _island(generate(tmp_path))
     assert data["generator"]["truncated"] is False
+
+
+def test_todo_records_have_ids(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] wire up CI\n")
+    data = _island(generate(tmp_path))
+    todos = data["project"]["openTodos"]
+    assert todos and all(t.get("id") and len(t["id"]) == 12 for t in todos)
+
+
+def test_search_body_char_cap_is_200():
+    from acc.generate import _SEARCH_BODY_CHARS
+    assert _SEARCH_BODY_CHARS == 200
+
+
+def test_escape_pass_caps_body_slice_multibyte_safe():
+    from acc.generate import _escape_text_fields, _SEARCH_BODY_CHARS
+    long_body = "héllo " * 100  # multibyte chars, well over the cap
+    inv = {"agents": [{"id": "i1", "title": "A", "path": "a.md",
+                       "summary": "s", "_rawBody": long_body}]}
+    docs = {"references": []}
+    project = {"title": "p", "openTodos": []}
+    _escape_text_fields(inv, docs, project)
+    slice_ = inv["agents"][0]["_searchBody"]
+    assert len(slice_) <= _SEARCH_BODY_CHARS          # char-capped
+    # "héllo " has no HTML-special chars so html.escape is a no-op here; escape
+    # correctness on hostile input is covered at the island level in a later task.
+    assert slice_ == long_body[:_SEARCH_BODY_CHARS]    # clean codepoint cut
+
+
+def test_build_search_record_shape_and_doc_type_label(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    recs = data["search"]
+    assert recs, "expected search records"
+    required = {"id", "type", "typeLabel", "title", "path", "text"}
+    for r in recs:
+        assert required <= set(r.keys())
+        assert all(isinstance(r[k], str) for k in required)
+    agent = next(r for r in recs if r["typeLabel"] == "Claude agent")
+    assert agent["type"] == "agent"
+    doc = next(r for r in recs if r["type"] == "doc")
+    assert doc["typeLabel"] in {"Reference", "PRD", "ADR", "Decision", "Workflow"}
+
+
+def test_build_search_includes_todos(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] wire up CI pipeline\n")
+    data = _island(generate(tmp_path))
+    todo_recs = [r for r in data["search"] if r["type"] == "todo"]
+    assert todo_recs, "TODOs must be in the search index"
+    r = todo_recs[0]
+    assert r["typeLabel"] == "TODO"
+    assert "wire up CI pipeline" in r["title"]
+    assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
+    # the todo id matches the rendered row id (jumpable)
+    todo_ids = {t["id"] for t in data["project"]["openTodos"]}
+    assert r["id"] in todo_ids
+
+
+def test_build_search_appends_escaped_body_slice():
+    from acc.generate import _build_search
+    inv = {"agents": [{"id": "i1", "type": "agent", "typeLabel": "Claude agent",
+                       "title": "A", "path": "a.md", "summary": "sum",
+                       "_searchBody": "BODYSLICE"}]}
+    docs = {"references": []}
+    recs = _build_search(inv, docs, [])
+    assert recs[0]["text"] == "sum BODYSLICE"
+
+
+def test_build_search_escapes_hostile_slice_in_island(tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "x.md").write_text(
+        '---\nname: ok\ndescription: "</script><img onerror=alert(1)>"\n---\n')
+    data = _island(generate(tmp_path))
+    blob = " ".join(r["text"] for r in data["search"])
+    assert "onerror=alert(1)>" not in blob
+    assert "&lt;img" in blob
+
+
+def test_build_search_stays_sorted(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    recs = data["search"]
+    keys = [(r["path"], r["title"], r["id"]) for r in recs]
+    assert keys == sorted(keys)
+
+
+def test_private_search_body_key_not_in_island(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    html = generate(tmp_path).read_text(encoding="utf-8")
+    assert "_searchBody" not in html
+
+
+def test_reduce_keeps_light_index_without_body():
+    from acc.generate import _reduce_for_size
+    data = {
+        "schemaVersion": "1.0",
+        "generator": {"truncated": False},
+        "inventory": {"agents": [], "skills": [], "hooks": [], "commands": [],
+                      "mcpServers": [], "rules": []},
+        "docs": {"prds": [], "adrs": [], "decisions": [], "workflows": [], "references": []},
+        "search": [
+            {"id": "i1", "type": "agent", "typeLabel": "Claude agent",
+             "title": "A", "path": "a.md", "text": "sum BODY"},
+            {"id": "i2", "type": "doc", "typeLabel": "Reference",
+             "title": "B", "path": "b.md", "text": "docsum BODY"},
+        ],
+    }
+    reduced = _reduce_for_size(data)
+    assert len(reduced["search"]) == 2          # not emptied
+    for r in reduced["search"]:
+        assert r["text"] == ""                   # body dropped
+        assert set(r.keys()) == {"id", "type", "typeLabel", "title", "path", "text"}
+    assert reduced["search"][0]["title"] == "A"  # names + paths kept
+
+
+def test_over_2mb_truncates_keeps_light_search(tmp_path):
+    make_claude_repo(tmp_path)
+    make_large_repo(tmp_path, 150)  # forces summary-only
+    data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is True
+    assert data["search"], "light index must survive truncation"
+    for r in data["search"]:
+        assert r["text"] == ""
+        assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())

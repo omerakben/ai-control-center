@@ -32,3 +32,19 @@ footer.acc-foot { padding: 16px; color: var(--muted); font-size: 11px; }
 .acc-banner:empty { display: none; }
 .acc-banner { padding: 8px 16px; border-bottom: 1px solid var(--line); }
 .acc-noticetext { color: var(--muted); font-size: 12px; }
+.acc-omnibox-wrap { position: relative; flex: 1 1 280px; max-width: 520px; }
+#acc-omnibox { width: 100%; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--fg); }
+.acc-omnibox-results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+  max-height: 60vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px; }
+.acc-omnibox-results[hidden] { display: none; }
+.acc-omni-group { padding: 4px 2px; }
+.acc-omni-grouphead { text-transform: uppercase; letter-spacing: .05em; font-size: 11px; color: var(--muted); margin: 6px 2px 2px; }
+.acc-omni-hit { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.acc-omni-hit:hover, .acc-omni-hit.acc-omni-active { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.acc-omni-title { font-weight: 600; }
+.acc-omni-snippet { color: var(--muted); font-size: 12px; flex-basis: 100%; }
+.acc-omni-more { color: var(--muted); font-size: 11px; padding: 2px 6px; }
+.acc-omni-note { color: var(--muted); font-size: 12px; padding: 4px 6px; }
+mark { background: #ffe066; color: #1a1a1a; border-radius: 2px; padding: 0 1px; }
+@keyframes acc-flash-kf { from { background: #ffe066; } to { background: transparent; } }
+.acc-flash { animation: acc-flash-kf 1.6s ease-out; }

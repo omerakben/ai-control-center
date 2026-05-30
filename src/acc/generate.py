@@ -8,7 +8,7 @@ from .digest import source_digest
 from .schema import SCHEMA_VERSION, validate
 from .render import render_html
 from .ids import rel_posix
-from .adapters.base import ScanContext, empty_inventory, empty_docs
+from .adapters.base import ScanContext, empty_inventory, empty_docs, doc_type_label
 from .adapters.generic import GenericAdapter, harvest_todos
 from .adapters.claude import ClaudeAdapter
 from .adapters.codex import CodexAdapter
@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 _WARN_BYTES = 1_000_000
 _TRUNCATE_BYTES = 2_000_000
+# Cap on the per-item body slice appended to each search record's `text`.
+# Budget math (pre-escape): at ~500 indexable items, 500 * 200 = 100 KB.
+# Post-escape worst case is ~5x (& -> &amp;), so ~500 KB at 500 items — still
+# under the _WARN_BYTES (1 MB) line. _reduce_for_size drops the slice entirely
+# above the budget, so it is the real safety valve. str slicing is codepoint-
+# based, so a char cap cuts cleanly on multibyte boundaries.
+_SEARCH_BODY_CHARS = 200
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
@@ -90,15 +97,42 @@ def _merge_parts(parts: list[dict]) -> tuple[dict, dict]:
     return inv, docs
 
 
-def _build_search(inv: dict, docs: dict) -> list[dict]:
+def _build_search(inv: dict, docs: dict, todos: list[dict]) -> list[dict]:
     records: list[dict] = []
-    for bucket in (docs, inv):
-        for items in bucket.values():
-            for it in items:
-                records.append({"id": it["id"], "title": it["title"],
-                                "path": it["path"], "text": it.get("summary", "")})
+    # Docs lack type/typeLabel (built by a separate adapter path keyed only by
+    # bucket); synthesize a fixed type="doc" + a bucket-derived typeLabel so doc
+    # hits group correctly instead of landing in an undefined group. Inventory
+    # items already carry both via make_item.
+    for bucket_key, items in docs.items():
+        label = doc_type_label(bucket_key)
+        for it in items:
+            records.append(_search_record(it, "doc", label))
+    for items in inv.values():
+        for it in items:
+            records.append(_search_record(it, it.get("type", ""), it.get("typeLabel", "")))
+    # TODOs are searchable+jumpable too (spec: every searchable item has a stable
+    # id). They carry {id,text,path} and no body — the (already-escaped) text is
+    # both the searchable and display title, so title=text and text="". type/
+    # typeLabel are fixed generator constants ("todo"/"TODO"), not author input.
+    for todo in todos:
+        records.append({"id": todo["id"], "type": "todo", "typeLabel": "TODO",
+                        "title": todo["text"], "path": todo["path"], "text": ""})
+    # Explicit sort is load-bearing: render.py's json.dumps(sort_keys=True) sorts
+    # dict keys but NOT list order, so determinism depends on this.
     records.sort(key=lambda r: (r["path"], r["title"], r["id"]))
     return records
+
+
+def _search_record(it: dict, type_: str, type_label: str) -> dict:
+    # text = escaped summary + escaped capped body slice (both escaped on the
+    # same pass in _escape_text_fields, preserving the "search reads escaped
+    # fields" contract). type/type_label are generator-controlled constants,
+    # not author input, so they are not escaped.
+    summary = it.get("summary", "")
+    body = it.get("_searchBody", "")
+    text = (summary + " " + body).strip() if body and body != summary else summary
+    return {"id": it["id"], "type": type_, "typeLabel": type_label,
+            "title": it["title"], "path": it["path"], "text": text}
 
 
 def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
@@ -119,6 +153,22 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                         # (and the renderer) never sees a list/dict here
                         value = it[field]
                         it[field] = _html.escape(value if isinstance(value, str) else "")
+                # Capture a capped, escaped body slice on the SAME pass so the
+                # island stays uniformly escaped and the later _build_search reads
+                # escaped fields (Phase 1 contract). Source: a raw body if the
+                # adapter carries one, else the (now-escaped) summary. char-cap the
+                # RAW source before escaping so the visible length, not the
+                # entity-expanded one, is what _SEARCH_BODY_CHARS bounds.
+                # `_rawBody` is the documented private override: an adapter may set
+                # it on an item to make the search slice come from full body text
+                # instead of the summary. No adapter sets it today (items fall back
+                # to the escaped summary); the branch is live plumbing for Phase 4b+.
+                raw = it.get("_rawBody")
+                if isinstance(raw, str) and raw:
+                    it["_searchBody"] = _html.escape(raw[:_SEARCH_BODY_CHARS])
+                else:
+                    # no raw body: reuse the already-escaped summary as the slice
+                    it["_searchBody"] = it.get("summary", "")
     project["title"] = _html.escape(project.get("title", ""))
     for todo in project.get("openTodos", []):
         if "text" in todo:
@@ -155,7 +205,13 @@ def _reduce_for_size(data: dict) -> dict:
             doc["summary"] = ""
             if "html" in doc:
                 doc["html"] = ""
-    reduced["search"] = []
+    # Light index: keep names + paths searchable after truncation, drop the
+    # body slice. The omnibox still finds items by name/path in degraded mode.
+    reduced["search"] = [
+        {"id": r["id"], "type": r["type"], "typeLabel": r["typeLabel"],
+         "title": r["title"], "path": r["path"], "text": ""}
+        for r in reduced["search"]
+    ]
     reduced["generator"]["truncated"] = True
     return reduced
 
@@ -205,7 +261,14 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
 
     inv, docs = _merge_parts(parts)
     _escape_text_fields(inv, docs, gpart["project"])  # escape titles/summaries for the island
-    search = _build_search(inv, docs)   # search reads the escaped fields (Phase 1 contract)
+    # _escape_text_fields ran first, so todo["text"] is already escaped here — the
+    # todo title enters the index uniformly escaped, like every other record.
+    search = _build_search(inv, docs, project["openTodos"])  # reads the escaped fields (Phase 1 contract)
+    # Drop the private slice key so it never reaches the serialized island.
+    for bucket in (inv, docs):
+        for items in bucket.values():
+            for it in items:
+                it.pop("_searchBody", None)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
