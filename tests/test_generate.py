@@ -1,8 +1,10 @@
 import json
+import logging
+import os
 import re
 from pathlib import Path
 from acc.generate import generate, detect_out_dir
-from tests.builders import make_multi_provider_repo, make_claude_repo, make_codex_repo
+from tests.builders import make_multi_provider_repo, make_claude_repo, make_codex_repo, make_large_repo
 
 
 def _make_repo(tmp_path):
@@ -161,3 +163,70 @@ def test_generate_digest_ignores_stale_other_dashboard(tmp_path):
     second = generate(tmp_path, out_dir=out_dir).read_text(encoding="utf-8")
     dig = lambda h: re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
     assert dig(first) == dig(second)
+
+
+def test_pathprefix_is_dotdot_for_provider_owner(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    assert data["source"]["pathPrefix"] == ".."
+
+
+def test_pathprefix_is_dot_when_out_is_root(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path, out_dir=tmp_path))
+    assert data["source"]["pathPrefix"] == "."
+
+
+def test_pathprefix_for_nested_out_dir(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path, out_dir=tmp_path / "a" / "b"))
+    assert data["source"]["pathPrefix"] == "../.."
+
+
+def test_pathprefix_empty_when_relpath_fails(tmp_path, monkeypatch):
+    make_claude_repo(tmp_path)
+
+    def boom(*a, **k):
+        raise ValueError("different drive")
+
+    # acc.generate calls os.path.relpath, and os.path is a shared module object, so patching it here affects the generator too.
+    monkeypatch.setattr(os.path, "relpath", boom)
+    data = _island(generate(tmp_path))
+    assert data["source"]["pathPrefix"] == ""
+
+
+def test_generator_truncated_defaults_false(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is False
+
+
+def test_over_2mb_truncates_to_summary_only(tmp_path):
+    make_claude_repo(tmp_path)        # real inventory items (agent/command/skill/hook/mcp)
+    make_large_repo(tmp_path, 150)    # bulk docs to exceed 2 MB
+    data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is True
+    assert data["search"] == []
+    for d in data["docs"]["references"]:
+        assert d["summary"] == "" and d["html"] == ""
+        assert "id" in d and "title" in d and "path" in d  # shape intact
+    # inventory summaries are blanked too (heaviest non-doc strings)
+    inv_items = [it for bucket in data["inventory"].values() for it in bucket]
+    assert inv_items, "fixture must have inventory to test inventory blanking"
+    for it in inv_items:
+        assert it["summary"] == ""
+
+
+def test_between_1_and_2mb_warns_and_keeps_full(tmp_path, caplog):
+    make_large_repo(tmp_path, 45)
+    with caplog.at_level(logging.WARNING):
+        data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is False
+    assert any(d["html"] for d in data["docs"]["references"])  # full kept
+    assert "exceeds" in caplog.text
+
+
+def test_small_repo_not_truncated(tmp_path):
+    make_claude_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is False

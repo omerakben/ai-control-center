@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Self-contained HTML control center generated from a repo's AI markdown"
 requires-python = ">=3.12"
 
+[project.optional-dependencies]
+test = ["pytest", "pytest-playwright"]
+
 [project.scripts]
 acc = "acc.cli:main"
 

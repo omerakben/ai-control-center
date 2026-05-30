@@ -1,4 +1,7 @@
+import copy
 import html as _html
+import logging
+import os
 from pathlib import Path
 from .scan import scan_files
 from .digest import source_digest
@@ -11,6 +14,11 @@ from .adapters.claude import ClaudeAdapter
 from .adapters.codex import CodexAdapter
 from .adapters.cursor import CursorAdapter
 from . import __version__
+
+logger = logging.getLogger(__name__)
+
+_WARN_BYTES = 1_000_000
+_TRUNCATE_BYTES = 2_000_000
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
@@ -97,6 +105,10 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
     # Escape every author-derived plain-text display field so hostile content
     # (script tags, onerror, </script>) can never reach the data island raw.
     # The `html` field is already sanitized by render_markdown_safe — leave it.
+    # `provider`/`typeLabel`/`displayName` are NOT escaped here because they are
+    # generator-controlled constants (adapter ids and fixed labels), never
+    # author input. If a future adapter derives any of them from frontmatter,
+    # add it to the escape pass below.
     for bucket in (inv, docs):
         for items in bucket.values():
             for it in items:
@@ -111,6 +123,41 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
     for todo in project.get("openTodos", []):
         if "text" in todo:
             todo["text"] = _html.escape(todo["text"])
+
+
+def _path_prefix(root: Path, out_dir: Path) -> str:
+    """Posix relative path from the dashboard's dir back to the repo root.
+
+    Normally "..", "." when out_dir == root, "../.." when nested. Returns ""
+    when the path is not expressible (e.g. a different Windows drive), in which
+    case the renderer falls back to plain-text paths instead of a broken href.
+    """
+    try:
+        return Path(os.path.relpath(root, out_dir)).as_posix()
+    except ValueError:
+        return ""
+
+
+def _reduce_for_size(data: dict) -> dict:
+    """Summary-only island: deep-copy then blank known heavy values.
+
+    Blanks every inventory/doc summary, every doc html body, and the search
+    array, and sets generator.truncated. Deep-copy-then-blank preserves every
+    key and optional field (item id, MCP config, doc id), so validate() and
+    assert_no_secrets still pass on the result.
+    """
+    reduced = copy.deepcopy(data)
+    for bucket in reduced["inventory"].values():
+        for item in bucket:
+            item["summary"] = ""
+    for bucket in reduced["docs"].values():
+        for doc in bucket:
+            doc["summary"] = ""
+            if "html" in doc:
+                doc["html"] = ""
+    reduced["search"] = []
+    reduced["generator"]["truncated"] = True
+    return reduced
 
 
 def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
@@ -164,9 +211,11 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
 
     data = {
         "schemaVersion": SCHEMA_VERSION,
-        "generator": {"name": "ai-control-center", "version": __version__, "rendererDigest": ""},
+        "generator": {"name": "ai-control-center", "version": __version__,
+                      "rendererDigest": "", "truncated": False},
         "source": {
             "repoName": root.name,
+            "pathPrefix": _path_prefix(root, out_dir),
             "dashboardPath": (
                 dashboard.relative_to(root).as_posix()
                 if dashboard.is_relative_to(root) else str(dashboard)
@@ -182,5 +231,19 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
         "search": search,
     }
     validate(data)
-    dashboard.write_text(render_html(data), encoding="utf-8")
+    html = render_html(data)
+    size = len(html.encode("utf-8"))
+    if size > _TRUNCATE_BYTES:
+        reduced = _reduce_for_size(data)
+        validate(reduced)
+        html = render_html(reduced)
+        rsize = len(html.encode("utf-8"))
+        logger.warning("dashboard %d bytes exceeds %d; reduced to %d bytes",
+                       size, _TRUNCATE_BYTES, rsize)
+        # Last-resort guard: reducer blanks heavy content so this is rarely hit.
+        if rsize > _TRUNCATE_BYTES:
+            logger.warning("reduced dashboard still %d bytes (over budget)", rsize)
+    elif size > _WARN_BYTES:
+        logger.warning("dashboard %d bytes exceeds %d", size, _WARN_BYTES)
+    dashboard.write_text(html, encoding="utf-8")
     return dashboard

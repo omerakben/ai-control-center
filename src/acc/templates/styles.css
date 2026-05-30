@@ -18,3 +18,17 @@ section { padding: 16px; border-bottom: 1px solid var(--line); }
 .acc-row .path { color: var(--muted); font-size: 11px; }
 footer.acc-foot { padding: 16px; color: var(--muted); font-size: 11px; }
 .acc-hidden { display: none; }
+.acc-rowhead { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.acc-chip { border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; font-size: 10px; color: var(--muted); }
+.acc-itemtitle { font-weight: 600; }
+.acc-summary { color: var(--muted); margin: 2px 0; }
+.acc-row a.path { display: inline-block; color: var(--muted); font-size: 11px; text-decoration: none; }
+.acc-row a.path:hover { text-decoration: underline; }
+.acc-sublabel { font-weight: 600; margin: 12px 0 4px; }
+.acc-bento { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.acc-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.acc-card-h { display: block; font-weight: 600; margin-bottom: 6px; color: var(--fg); text-decoration: none; }
+.acc-card a.acc-card-h:hover { text-decoration: underline; }
+.acc-banner:empty { display: none; }
+.acc-banner { padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.acc-noticetext { color: var(--muted); font-size: 12px; }
