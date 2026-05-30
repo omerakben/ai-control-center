@@ -1,4 +1,4 @@
-from acc.adapters.base import make_item, empty_inventory, empty_docs
+from acc.adapters.base import make_item, empty_inventory, empty_docs, doc_type_label
 
 
 def test_make_item_has_full_shape_and_stable_id():
@@ -27,7 +27,6 @@ def test_empty_shapes_have_expected_buckets():
 
 
 def test_doc_type_label_maps_buckets():
-    from acc.adapters.base import doc_type_label
     assert doc_type_label("references") == "Reference"
     assert doc_type_label("prds") == "PRD"
     assert doc_type_label("adrs") == "ADR"
@@ -36,5 +35,4 @@ def test_doc_type_label_maps_buckets():
 
 
 def test_doc_type_label_unknown_bucket_titlecases():
-    from acc.adapters.base import doc_type_label
     assert doc_type_label("misc") == "Misc"
