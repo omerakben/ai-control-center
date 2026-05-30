@@ -2,6 +2,7 @@ import copy
 import html as _html
 import logging
 import os
+import re
 from pathlib import Path
 from .scan import scan_files
 from .digest import source_digest
@@ -31,6 +32,13 @@ _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cu
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
 _PRECEDENCE = ("claude", "codex", "cursor")
 _KNOWN_OWNER_DIRS = (".claude", ".codex", ".cursor", ".ai-control-center")
+
+# The provider config files that declare MCP servers and hooks. They are the
+# `declares` channel, so they are never `reference` targets — otherwise a
+# single-server config (one id, unique path) would draw a stray reference edge.
+_CONFIG_PATHS = frozenset({
+    ".claude/settings.json", ".mcp.json", ".codex/config.toml", ".cursor/mcp.json",
+})
 
 
 class OwnerAmbiguousError(Exception):
@@ -95,6 +103,54 @@ def _merge_parts(parts: list[dict]) -> tuple[dict, dict]:
         for k in bucket:
             bucket[k].sort(key=lambda x: (x["path"], x["title"], x["id"]))
     return inv, docs
+
+
+def _build_relationships(inv: dict, docs: dict) -> list[dict]:
+    """Deterministic edges over the merged inventory + docs.
+
+    `reference`: a doc body mentions an inventory item's exact, unique,
+    boundary-delimited repo-relative path. `declares` (Task 3): a config-file
+    node -> the MCP servers / hooks it declares.
+    """
+    edges: list[dict] = []
+
+    # reference pass: path -> set(ids) over inventory items only, keep unique
+    # paths that are not a provider config file.
+    path_ids: dict[str, set[str]] = {}
+    for items in inv.values():
+        for it in items:
+            path_ids.setdefault(it["path"], set()).add(it["id"])
+    unique = {p: next(iter(ids)) for p, ids in path_ids.items()
+              if len(ids) == 1 and p not in _CONFIG_PATHS}
+    # boundary match: reject a hit that is part of a longer path/word token
+    matchers = {p: re.compile(r"(?<![\w./-])" + re.escape(p) + r"(?![\w./-])")
+                for p in unique}
+    for bucket in docs.values():
+        for doc in bucket:
+            body = doc.get("_refScanBody", "")
+            if not body:
+                continue
+            for path, item_id in unique.items():
+                if item_id == doc["id"]:
+                    continue  # self-edge guard
+                if matchers[path].search(body):
+                    edges.append({"from": doc["id"], "to": item_id,
+                                  "type": "reference", "evidence": path})
+
+    return _dedup_sort_edges(edges)
+
+
+def _dedup_sort_edges(edges: list[dict]) -> list[dict]:
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for e in edges:
+        key = (e["from"], e["to"], e["type"])
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+    out.sort(key=lambda e: (e["from"], e["to"], e["type"]))
+    return out
 
 
 def _build_search(inv: dict, docs: dict, todos: list[dict]) -> list[dict]:
