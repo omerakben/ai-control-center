@@ -10,13 +10,50 @@ from . import __version__
 
 _PROVIDER_DIRS = (".claude", ".codex", ".cursor")
 
+_PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
+_PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
+_PRECEDENCE = ("claude", "codex", "cursor")
+_KNOWN_OWNER_DIRS = (".claude", ".codex", ".cursor", ".ai-control-center")
+
+
+class OwnerAmbiguousError(Exception):
+    pass
+
+
+def detect_providers(root: Path) -> list[str]:
+    root = root.resolve()
+    out: list[str] = []
+    for pid in _PRECEDENCE:
+        if (root / _PROVIDER_DIR_BY_ID[pid]).is_dir() or (root / _PROVIDER_MARKERS[pid]).is_file():
+            out.append(pid)
+    return out
+
+
+def _existing_dashboards(root: Path) -> list[Path]:
+    return [root / d / "dashboard.html" for d in _KNOWN_OWNER_DIRS
+            if (root / d / "dashboard.html").is_file()]
+
+
+def resolve_owner(root: Path, detected_ids: list[str], owner_override: str | None = None) -> Path:
+    root = root.resolve()
+    if owner_override:
+        return (root / owner_override).resolve()
+    existing = _existing_dashboards(root)
+    if len(existing) == 1:
+        return existing[0].parent.resolve()
+    if len(existing) >= 2:
+        names = ", ".join(d.parent.relative_to(root).as_posix() for d in existing)
+        raise OwnerAmbiguousError(
+            f"multiple dashboards found ({names}); pick one with --owner <dir>")
+    for pid in _PRECEDENCE:
+        if pid in detected_ids:
+            return (root / _PROVIDER_DIR_BY_ID[pid]).resolve()
+    return (root / ".ai-control-center").resolve()
+
 
 def detect_out_dir(root: Path) -> Path:
     root = root.resolve()
-    for prov in _PROVIDER_DIRS:
-        if (root / prov).is_dir():
-            return (root / prov).resolve()
-    return (root / ".ai-control-center").resolve()
+    return resolve_owner(root, detect_providers(root))
 
 
 def _build_search(part: dict) -> list[dict]:
