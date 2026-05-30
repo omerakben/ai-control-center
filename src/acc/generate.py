@@ -198,7 +198,13 @@ def _reduce_for_size(data: dict) -> dict:
             doc["summary"] = ""
             if "html" in doc:
                 doc["html"] = ""
-    reduced["search"] = []
+    # Light index: keep names + paths searchable after truncation, drop the
+    # body slice. The omnibox still finds items by name/path in degraded mode.
+    reduced["search"] = [
+        {"id": r["id"], "type": r["type"], "typeLabel": r["typeLabel"],
+         "title": r["title"], "path": r["path"], "text": ""}
+        for r in reduced["search"]
+    ]
     reduced["generator"]["truncated"] = True
     return reduced
 

@@ -206,7 +206,7 @@ def test_over_2mb_truncates_to_summary_only(tmp_path):
     make_large_repo(tmp_path, 150)    # bulk docs to exceed 2 MB
     data = _island(generate(tmp_path))
     assert data["generator"]["truncated"] is True
-    assert data["search"] == []
+    assert data["search"] and all(r["text"] == "" for r in data["search"])
     for d in data["docs"]["references"]:
         assert d["summary"] == "" and d["html"] == ""
         assert "id" in d and "title" in d and "path" in d  # shape intact
@@ -308,3 +308,37 @@ def test_private_search_body_key_not_in_island(tmp_path):
     make_multi_provider_repo(tmp_path)
     html = generate(tmp_path).read_text(encoding="utf-8")
     assert "_searchBody" not in html
+
+
+def test_reduce_keeps_light_index_without_body():
+    from acc.generate import _reduce_for_size
+    data = {
+        "schemaVersion": "1.0",
+        "generator": {"truncated": False},
+        "inventory": {"agents": [], "skills": [], "hooks": [], "commands": [],
+                      "mcpServers": [], "rules": []},
+        "docs": {"prds": [], "adrs": [], "decisions": [], "workflows": [], "references": []},
+        "search": [
+            {"id": "i1", "type": "agent", "typeLabel": "Claude agent",
+             "title": "A", "path": "a.md", "text": "sum BODY"},
+            {"id": "i2", "type": "doc", "typeLabel": "Reference",
+             "title": "B", "path": "b.md", "text": "docsum BODY"},
+        ],
+    }
+    reduced = _reduce_for_size(data)
+    assert len(reduced["search"]) == 2          # not emptied
+    for r in reduced["search"]:
+        assert r["text"] == ""                   # body dropped
+        assert set(r.keys()) == {"id", "type", "typeLabel", "title", "path", "text"}
+    assert reduced["search"][0]["title"] == "A"  # names + paths kept
+
+
+def test_over_2mb_truncates_keeps_light_search(tmp_path):
+    make_claude_repo(tmp_path)
+    make_large_repo(tmp_path, 150)  # forces summary-only
+    data = _island(generate(tmp_path))
+    assert data["generator"]["truncated"] is True
+    assert data["search"], "light index must survive truncation"
+    for r in data["search"]:
+        assert r["text"] == ""
+        assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
