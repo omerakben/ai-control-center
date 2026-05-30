@@ -117,3 +117,18 @@ def test_omnibox_and_filter_inputs_distinct(page, tmp_path):
     assert "find" in (omni.get_attribute("aria-label") or "").lower()
     assert "filter" in (filt.get_attribute("aria-label") or "").lower()
     assert page.locator("#acc-omnibox-results").count() == 1
+
+
+def test_jump_scrolls_and_flashes_exact_row(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    target_id = page.evaluate("() => document.querySelector('#acc-inventory .acc-item').dataset.id")
+    page.evaluate("(id) => window.__accJump(id)", target_id)
+    row = page.locator('.acc-item[data-id="%s"]' % target_id)
+    assert row.evaluate("el => el.classList.contains('acc-flash')")
+
+
+def test_jump_unknown_id_does_not_throw(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    page.set_content(_html(tmp_path))
+    assert page.evaluate("() => { window.__accJump('nope_no_row'); return true; }") is True

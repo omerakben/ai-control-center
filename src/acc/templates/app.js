@@ -184,11 +184,34 @@
     });
   }
 
+  var rowById = new Map();
+
+  function buildRowIndex() {
+    rowById.clear();
+    document.querySelectorAll(".acc-item[data-id]").forEach(function (row) {
+      // first rendered row wins for a given id (ids are stable + unique anyway)
+      if (!rowById.has(row.dataset.id)) rowById.set(row.dataset.id, row);
+    });
+  }
+
+  function jumpTo(id) {
+    var row = rowById.get(id);
+    if (!row) return; // degrade: empty bucket skipped, or light/truncated mode
+    row.scrollIntoView({ block: "center" });
+    row.classList.remove("acc-flash");
+    // reflow so re-adding the class restarts the flash animation
+    void row.offsetWidth;
+    row.classList.add("acc-flash");
+    window.setTimeout(function () { row.classList.remove("acc-flash"); }, 1600);
+  }
+  window.__accJump = jumpTo;
+
   renderHead();
   renderBanner();
   renderOverview();
   renderInventory();
   renderDocs();
   renderTodos();
+  buildRowIndex();
   wireSearch();
 })();
