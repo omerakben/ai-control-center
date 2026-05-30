@@ -123,12 +123,15 @@ than building anything new for navigation.
   unique reference target and produce a stray `reference` edge alongside its `declares`.
 - **Boundary match, not bare substring.** For each doc, scan its `_refScanBody` for each
   remaining unique path with
-  `re.compile(r'(?<![\w./-])' + re.escape(path) + r'(?![\w./-])')`. A bare `path in body`
-  produces phantom edges: `.claude/agents/x.md` matches inside `.claude/agents/x.md.bak`,
-  and a short generic doc `API.md` matches inside `legacy_API.md.old` or prose. The
-  boundary rule rejects a hit unless the chars on both sides are not path-continuation
-  characters (`[\w./-]`) or string ends. A markdown link `[x](.claude/agents/x.md)` still
-  matches because the path appears as a delimited token.
+  `re.compile(r'(?<![\w./-])' + re.escape(path) + r'(?![\w/-])(?!\.[\w/-])')`. A bare
+  `path in body` produces phantom edges: `.claude/agents/x.md` matches inside
+  `.claude/agents/x.md.bak`, and a short generic doc `API.md` matches inside
+  `legacy_API.md.old` or prose. The right boundary rejects a hit when the next char is a
+  word/slash/hyphen (`mdx`, `/foo`, `-1`) or when it is a `.` that continues into a
+  word/slash/hyphen (`.bak`, a second extension) — while still allowing a `.` that is a
+  sentence terminator (`…x.md.` at end of a sentence), so a path written at the end of a
+  sentence still matches. The left boundary rejects a hit preceded by `[\w./-]`. A markdown
+  link `[x](.claude/agents/x.md)` matches because the path appears as a delimited token.
 - On a match, emit `{from: doc.id, to: item.id, type: "reference", evidence: item.path}`.
   Skip self-edges (`from == to`) defensively. Repeated mentions collapse to one edge
   (dedup on the triple); evidence is the item's canonical path, so it is fixed regardless
