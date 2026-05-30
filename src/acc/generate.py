@@ -4,8 +4,12 @@ from .scan import scan_files
 from .digest import source_digest
 from .schema import SCHEMA_VERSION, validate
 from .render import render_html
-from .adapters.base import ScanContext
+from .ids import rel_posix
+from .adapters.base import ScanContext, empty_inventory, empty_docs
 from .adapters.generic import GenericAdapter
+from .adapters.claude import ClaudeAdapter
+from .adapters.codex import CodexAdapter
+from .adapters.cursor import CursorAdapter
 from . import __version__
 
 _PROVIDER_DIRS = (".claude", ".codex", ".cursor")
@@ -56,49 +60,83 @@ def detect_out_dir(root: Path) -> Path:
     return resolve_owner(root, detect_providers(root))
 
 
-def _build_search(part: dict) -> list[dict]:
+_FIRST_CLASS = (ClaudeAdapter, CodexAdapter, CursorAdapter)
+_CLAIM_DIRS = (".claude", ".codex", ".cursor")
+_CLAIM_MARKERS = ("CLAUDE.md", "AGENTS.md", ".cursorrules")
+
+
+def _claimed_by_provider(rel: str) -> bool:
+    top = rel.split("/", 1)[0]
+    return top in _CLAIM_DIRS or rel in _CLAIM_MARKERS
+
+
+def _merge_parts(parts: list[dict]) -> tuple[dict, dict]:
+    inv = empty_inventory()
+    docs = empty_docs()
+    for part in parts:
+        for k, items in part.get("inventory", {}).items():
+            inv.setdefault(k, []).extend(items)
+        for k, items in part.get("docs", {}).items():
+            docs.setdefault(k, []).extend(items)
+    for bucket in (inv, docs):
+        for k in bucket:
+            bucket[k].sort(key=lambda x: (x["path"], x["title"], x["id"]))
+    return inv, docs
+
+
+def _build_search(inv: dict, docs: dict) -> list[dict]:
     records: list[dict] = []
-    for group in part["docs"].values():
-        for doc in group:
-            # summary is already HTML-escaped by _escape_plain_text_fields;
-            # do NOT call _html.escape again or & becomes &amp;amp; etc.
-            records.append({"id": doc["id"], "title": doc["title"],
-                            "path": doc["path"], "text": doc.get("summary", "")})
-    records.sort(key=lambda r: (r["path"], r["title"]))
+    for bucket in (docs, inv):
+        for items in bucket.values():
+            for it in items:
+                records.append({"id": it["id"], "title": it["title"],
+                                "path": it["path"], "text": it.get("summary", "")})
+    records.sort(key=lambda r: (r["path"], r["title"], r["id"]))
     return records
 
 
-def _escape_plain_text_fields(part: dict) -> None:
-    """HTML-escape summary (plain-text) on every doc so raw tags never appear in the output file."""
-    for group in part["docs"].values():
-        for doc in group:
-            if "summary" in doc:
-                doc["summary"] = _html.escape(doc["summary"])
+def _escape_summaries(inv: dict, docs: dict) -> None:
+    for bucket in (inv, docs):
+        for items in bucket.values():
+            for it in items:
+                if "summary" in it:
+                    it["summary"] = _html.escape(it["summary"])
 
 
-def generate(root: Path, out_dir: Path | None = None) -> Path:
+def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
     root = root.resolve()
+    all_files = scan_files(root)
 
-    # Resolve out_dir early so we can compute the dashboard path and exclude
-    # only that one file from the source scan.  Provider-folder markdown
-    # (.claude/**, .codex/**, .cursor/**) must remain in the scan — that is
-    # the content this tool exists to surface.  Excluding only the generated
-    # dashboard keeps source_digest stable across repeated calls without
-    # silently dropping provider-folder docs.
-    out_dir = out_dir.resolve() if out_dir else detect_out_dir(root)
+    detected_ids = detect_providers(root)
+    out_dir = out_dir.resolve() if out_dir else resolve_owner(root, detected_ids, owner)
     dashboard = (out_dir / "dashboard.html").resolve()
 
-    all_files = scan_files(root)
-    # Exclude ONLY the generated dashboard, not the whole provider directory.
     files = [f for f in all_files if f.resolve() != dashboard]
-
     ctx = ScanContext(root=root, files=files)
-    adapter = GenericAdapter()
-    proot = adapter.detect(ctx)[0]
-    part = adapter.normalize(ctx, proot)
 
-    # Escape plain-text fields before they land in the HTML data island.
-    _escape_plain_text_fields(part)
+    parts: list[dict] = []
+    provider_summaries: list[dict] = []
+    for adapter_cls in _FIRST_CLASS:
+        adapter = adapter_cls()
+        roots = adapter.detect(ctx)
+        if not roots:
+            continue
+        part = adapter.normalize(ctx, roots[0])
+        parts.append(part)
+        provider_summaries.append(part["provider"])
+
+    # generic indexes only the markdown not claimed by a provider folder/marker
+    unclaimed = [f for f in files if not _claimed_by_provider(rel_posix(f, root))]
+    gctx = ScanContext(root=root, files=unclaimed)
+    gadapter = GenericAdapter()
+    gpart = gadapter.normalize(gctx, gadapter.detect(gctx)[0])
+    parts.append(gpart)
+    provider_summaries.append({"id": "generic", "displayName": "Generic",
+                               "root": ".", "detected": True})
+
+    inv, docs = _merge_parts(parts)
+    _escape_summaries(inv, docs)        # escape plain-text summaries for the island
+    search = _build_search(inv, docs)   # search reads escaped summaries (Phase 1 contract)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -107,21 +145,19 @@ def generate(root: Path, out_dir: Path | None = None) -> Path:
         "generator": {"name": "ai-control-center", "version": __version__, "rendererDigest": ""},
         "source": {
             "repoName": root.name,
-            # dashboard and root are already resolved above — no need to re-resolve.
             "dashboardPath": (
                 dashboard.relative_to(root).as_posix()
-                if dashboard.is_relative_to(root)
-                else str(dashboard)
+                if dashboard.is_relative_to(root) else str(dashboard)
             ),
             "sourceDigest": source_digest(files, root),
             "vcs": {"kind": "none"},
         },
-        "providers": [{"id": "generic", "displayName": "Generic", "root": "."}],
-        "project": part["project"],
-        "inventory": part["inventory"],
-        "docs": part["docs"],
-        "relationships": part["relationships"],
-        "search": _build_search(part),
+        "providers": provider_summaries,
+        "project": gpart["project"],
+        "inventory": inv,
+        "docs": docs,
+        "relationships": [],
+        "search": search,
     }
     validate(data)
     dashboard.write_text(render_html(data), encoding="utf-8")

@@ -1,5 +1,7 @@
+import json
 from pathlib import Path
 from acc.generate import generate, detect_out_dir
+from tests.builders import make_multi_provider_repo, make_claude_repo
 
 
 def _make_repo(tmp_path):
@@ -54,3 +56,58 @@ def test_generate_includes_provider_folder_markdown(tmp_path):
     html = out.read_text(encoding="utf-8")
     assert "Claude Instructions" in html
     assert ".claude/CLAUDE.md" in html
+
+
+def _island(out_path) -> dict:
+    html = out_path.read_text(encoding="utf-8")
+    raw = html.split('id="acc-data"', 1)[1].split(">", 1)[1].split("</script>", 1)[0]
+    return json.loads(raw.replace("<\\/", "</"))
+
+
+def test_generate_merges_all_providers(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    out = generate(tmp_path)
+    data = _island(out)
+    ids = {p["id"] for p in data["providers"]}
+    assert {"claude", "codex", "cursor", "generic"} <= ids
+    assert any(a["typeLabel"] == "Claude agent" for a in data["inventory"]["agents"])
+    assert any(r["typeLabel"] == "Cursor rule" for r in data["inventory"]["rules"])
+    assert data["inventory"]["mcpServers"], "expected merged mcp servers"
+
+
+def test_generate_owner_is_dot_claude_for_multi(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    out = generate(tmp_path)
+    assert out.resolve() == (tmp_path / ".claude" / "dashboard.html").resolve()
+
+
+def test_generate_multi_provider_is_deterministic(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    first = generate(tmp_path).read_text(encoding="utf-8")
+    second = generate(tmp_path).read_text(encoding="utf-8")
+    assert first == second
+
+
+def test_generic_does_not_double_list_provider_files(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    data = _island(generate(tmp_path))
+    ref_paths = [d["path"] for d in data["docs"]["references"]]
+    # provider files appear via their adapters, never duplicated by generic
+    assert ref_paths == sorted(set(ref_paths))
+    # the loose doc is indexed; the agent file is NOT a generic reference
+    assert "docs/notes.md" in ref_paths
+    assert ".claude/agents/reviewer.md" not in ref_paths
+
+
+def test_generate_drops_mcp_env_secret(tmp_path):
+    make_claude_repo(tmp_path)
+    out = generate(tmp_path)
+    assert "s3cr3tpassword" not in out.read_text(encoding="utf-8")
+
+
+def test_generate_tripwire_blocks_unredacted_leak(tmp_path):
+    # an agent whose frontmatter description carries a token shape
+    make_claude_repo(tmp_path, with_secret=True)
+    out = generate(tmp_path)
+    # the description is redacted, so the token never reaches the file
+    assert "ghp_0123456789abcdefghij" not in out.read_text(encoding="utf-8")
