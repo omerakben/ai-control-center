@@ -230,3 +230,11 @@ def test_small_repo_not_truncated(tmp_path):
     make_claude_repo(tmp_path)
     data = _island(generate(tmp_path))
     assert data["generator"]["truncated"] is False
+
+
+def test_todo_records_have_ids(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] wire up CI\n")
+    data = _island(generate(tmp_path))
+    todos = data["project"]["openTodos"]
+    assert todos and all(t.get("id") and len(t["id"]) == 12 for t in todos)
