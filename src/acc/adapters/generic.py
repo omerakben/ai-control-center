@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from .base import ScanContext, ProviderRoot
 from ..ids import stable_id, rel_posix
 from ..redaction import redact_text
@@ -51,6 +52,35 @@ def _first_paragraph(text: str) -> str:
     return ""
 
 
+def _extract_todos(text: str, rel: str) -> list[dict]:
+    """Open-checkbox (`- [ ]`) lines from already-redacted markdown."""
+    return [{"text": m.group(1).strip(), "path": rel}
+            for line in text.splitlines()
+            if (m := _TODO.match(line))]
+
+
+def harvest_todos(files: list[Path], root: Path) -> list[dict]:
+    """Open TODOs from markdown that GenericAdapter does not index itself.
+
+    Provider docs (CLAUDE.md, AGENTS.md, .claude/**, ...) are filtered out of
+    generic doc indexing, but the open TODOs inside them still belong to the
+    project. Pull them out here so the filter does not silently drop them.
+    Redaction is applied before extraction, exactly as the adapter does.
+    """
+    todos: list[dict] = []
+    for p in files:
+        if p.suffix.lower() != ".md":
+            continue
+        rel = rel_posix(p, root)
+        try:
+            raw = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        clean, _ = redact_text(raw)
+        todos.extend(_extract_todos(clean, rel))
+    return todos
+
+
 class GenericAdapter:
     id = "generic"
     display_name = "Generic"
@@ -79,10 +109,7 @@ class GenericAdapter:
                 "summary": _first_paragraph(clean),
                 "html": render_markdown_safe(clean),
             })
-            for line in clean.splitlines():
-                m = _TODO.match(line)
-                if m:
-                    todos.append({"text": m.group(1).strip(), "path": rel})
+            todos.extend(_extract_todos(clean, rel))
             if rel.lower() == "readme.md" and heading:
                 title = heading
         docs.sort(key=lambda d: d["path"])

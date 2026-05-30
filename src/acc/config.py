@@ -1,0 +1,65 @@
+import json
+import logging
+import tomllib
+from pathlib import Path
+
+from .redaction import allowlist_config
+
+logger = logging.getLogger(__name__)
+
+# MCP server config keys that are safe to surface. `type` is the transport
+# (stdio/http/sse); `url` is redacted for embedded credentials. Everything
+# else (env, headers, tokens, ...) is dropped — this tier fails closed.
+MCP_ALLOWED = {"command", "args", "type", "url"}
+
+
+def load_json(path: Path) -> dict:
+    # A missing config is the normal case (adapters probe optional paths), so
+    # stay silent on absence and only warn when a file exists but won't parse.
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("skipping malformed config %s: %s", path, exc)
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def load_toml(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("rb") as f:
+            return tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        logger.warning("skipping malformed config %s: %s", path, exc)
+        return {}
+
+
+def as_dict(value) -> dict:
+    """Coerce a parsed-config value to a dict before iterating it.
+
+    `load_json`/`load_toml` guard only the document root, and the `... or {}`
+    idiom guards only None/empty — a well-formed-but-wrong-shape value (a list,
+    string, or a TOML `[[mcp_servers]]` array-of-tables) is truthy and would
+    crash `.items()`. Per the design's no-crash contract, treat it as empty.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def safe_mcp(server: dict) -> dict:
+    """Allowlist a single MCP server config, redacting surviving values."""
+    return allowlist_config(server, MCP_ALLOWED)
+
+
+def mcp_summary(clean: dict) -> str:
+    """One-line MCP summary: the command, else the url, else empty.
+
+    A malformed config can make `command`/`url` a non-string (a list of argv
+    parts, a dict). Display fields must stay strings — `html.escape` runs on
+    them downstream — so coerce any non-string to empty, the same fail-closed
+    posture `as_dict` takes for wrong-shape containers.
+    """
+    value = clean.get("command") or clean.get("url") or ""
+    return value if isinstance(value, str) else ""
