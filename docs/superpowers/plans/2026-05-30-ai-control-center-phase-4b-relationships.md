@@ -96,6 +96,23 @@ In `src/acc/adapters/generic.py`, the doc append in `normalize`:
             })
 ```
 
+Also pop `_refScanBody` in `generate.py` so it never reaches the island yet
+(`_refScanBody` is redacted but **unescaped** — leaving it in would regress the
+hostile-markdown test). In `src/acc/generate.py`, the existing private-field pop
+loop (~lines 268-271) drops `_searchBody`; add `_refScanBody` beside it:
+
+```python
+    for bucket in (inv, docs):
+        for items in bucket.values():
+            for it in items:
+                it.pop("_searchBody", None)
+                it.pop("_refScanBody", None)
+```
+
+Task 4 later rewrites this region to call `_build_relationships` (which reads
+`_refScanBody`) *before* this pop, so the field is read then dropped. Until
+then it is set-then-popped, keeping every commit green.
+
 - [ ] **Step 4: Add codex + generic coverage to the test, run to verify it passes**
 
 ```python
