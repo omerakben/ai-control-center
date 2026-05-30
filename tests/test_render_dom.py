@@ -289,6 +289,23 @@ def test_omnibox_finds_and_jumps_to_todo(page, tmp_path):
     assert "wire up ci pipeline" in flashed.inner_text().lower()
 
 
+def test_inline_related_is_bidirectional_and_jumps(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "links.md").write_text(
+        "# Links\n\nThe .claude/agents/reviewer.md agent handles reviews.")
+    page.set_content(_html(tmp_path))
+    agent_row = page.locator('.acc-item', has_text="reviewer").first
+    rel = agent_row.locator('.acc-related')
+    assert rel.count() == 1
+    assert rel.locator('button', has_text="referenced by").count() >= 1
+    # related controls are not indexable rows
+    assert agent_row.locator('.acc-related .acc-item').count() == 0
+    assert agent_row.locator('.acc-related [data-id]').count() == 0
+    # a declares label appears on an MCP server row, as text (not a jump button)
+    mcp_row = page.locator('#acc-inventory .acc-item', has_text="local").first
+    assert mcp_row.locator('.acc-related', has_text="declared in").count() == 1
+
+
 def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))

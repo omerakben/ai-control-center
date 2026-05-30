@@ -206,6 +206,72 @@
   }
   window.__accJump = jumpTo;
 
+  var metaById = {};
+  function buildMeta() {
+    var inv = data.inventory || {};
+    Object.keys(inv).forEach(function (b) {
+      (inv[b] || []).forEach(function (it) {
+        metaById[it.id] = { title: it.title, typeLabel: it.typeLabel, path: it.path };
+      });
+    });
+    var docs = data.docs || {};
+    Object.keys(docs).forEach(function (g) {
+      (docs[g] || []).forEach(function (d) {
+        metaById[d.id] = { title: d.title, typeLabel: g, path: d.path };
+      });
+    });
+    (data.project.openTodos || []).forEach(function (t) {
+      metaById[t.id] = { title: t.text, typeLabel: "TODO", path: t.path };
+    });
+  }
+
+  var edgesByEndpoint = {};
+  function buildEdgeIndex() {
+    (data.relationships || []).forEach(function (e) {
+      (edgesByEndpoint[e.from] || (edgesByEndpoint[e.from] = []))
+        .push({ otherId: e.to, dir: "out", type: e.type, evidence: e.evidence });
+      (edgesByEndpoint[e.to] || (edgesByEndpoint[e.to] = []))
+        .push({ otherId: e.from, dir: "in", type: e.type, evidence: e.evidence });
+    });
+  }
+
+  var REL_VERB = {
+    "reference|out": "references", "reference|in": "referenced by",
+    "declares|out": "declares", "declares|in": "declared in"
+  };
+
+  function relatedEntry(edge) {
+    var verb = REL_VERB[edge.type + "|" + edge.dir] || edge.type;
+    var meta = metaById[edge.otherId];
+    if (edge.type === "declares" && edge.dir === "in") {
+      var label = el("span", "acc-rel-line");
+      label.appendChild(el("span", "acc-rel-verb", verb));
+      label.appendChild(el("span", "path", edge.evidence));
+      return label;
+    }
+    if (!meta) return null;
+    var btn = el("button", "acc-rel-line");
+    btn.type = "button";
+    btn.appendChild(el("span", "acc-rel-verb", verb));
+    btn.appendChild(el("span", "acc-chip", meta.typeLabel));
+    btn.appendChild(el("span", "acc-rel-title", htmlUnescape(meta.title)));
+    btn.addEventListener("click", function () { jumpTo(edge.otherId); });
+    return btn;
+  }
+
+  function decorateRelated() {
+    rowById.forEach(function (row, id) {
+      var edges = edgesByEndpoint[id];
+      if (!edges || !edges.length) return;
+      var box = el("div", "acc-related");
+      edges.forEach(function (e) {
+        var node = relatedEntry(e);
+        if (node) box.appendChild(node);
+      });
+      if (box.children.length) row.appendChild(box);
+    });
+  }
+
   var OMNI_GROUP_CAP = 8;
   var INV_TYPE_ORDER = ["agent", "command", "skill", "hook", "mcpServer", "rule", "doc", "todo"];
 
@@ -352,6 +418,8 @@
     });
   }
 
+  buildMeta();
+  buildEdgeIndex();
   renderHead();
   renderBanner();
   renderOverview();
@@ -359,6 +427,7 @@
   renderDocs();
   renderTodos();
   buildRowIndex();
+  decorateRelated();
   wireOmnibox();
   wireSearch();
 })();
