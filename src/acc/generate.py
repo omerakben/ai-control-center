@@ -1,4 +1,6 @@
+import copy
 import html as _html
+import logging
 import os
 from pathlib import Path
 from .scan import scan_files
@@ -12,6 +14,11 @@ from .adapters.claude import ClaudeAdapter
 from .adapters.codex import CodexAdapter
 from .adapters.cursor import CursorAdapter
 from . import __version__
+
+logger = logging.getLogger(__name__)
+
+_WARN_BYTES = 1_000_000
+_TRUNCATE_BYTES = 2_000_000
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
@@ -127,6 +134,28 @@ def _path_prefix(root: Path, out_dir: Path) -> str:
         return ""
 
 
+def _reduce_for_size(data: dict) -> dict:
+    """Summary-only island: deep-copy then blank known heavy values.
+
+    Blanks every inventory/doc summary, every doc html body, and the search
+    array, and sets generator.truncated. Deep-copy-then-blank preserves every
+    key and optional field (item id, MCP config, doc id), so validate() and
+    assert_no_secrets still pass on the result.
+    """
+    reduced = copy.deepcopy(data)
+    for bucket in reduced["inventory"].values():
+        for item in bucket:
+            item["summary"] = ""
+    for bucket in reduced["docs"].values():
+        for doc in bucket:
+            doc["summary"] = ""
+            if "html" in doc:
+                doc["html"] = ""
+    reduced["search"] = []
+    reduced["generator"]["truncated"] = True
+    return reduced
+
+
 def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
     root = root.resolve()
     all_files = scan_files(root)
@@ -198,5 +227,19 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
         "search": search,
     }
     validate(data)
-    dashboard.write_text(render_html(data), encoding="utf-8")
+    html = render_html(data)
+    size = len(html.encode("utf-8"))
+    if size > _TRUNCATE_BYTES:
+        reduced = _reduce_for_size(data)
+        validate(reduced)
+        html = render_html(reduced)
+        rsize = len(html.encode("utf-8"))
+        logger.warning("dashboard %d bytes exceeds %d; reduced to %d bytes",
+                       size, _TRUNCATE_BYTES, rsize)
+        # Last-resort guard: reducer blanks heavy content so this is rarely hit.
+        if rsize > _TRUNCATE_BYTES:
+            logger.warning("reduced dashboard still %d bytes (over budget)", rsize)
+    elif size > _WARN_BYTES:
+        logger.warning("dashboard %d bytes exceeds %d", size, _WARN_BYTES)
+    dashboard.write_text(html, encoding="utf-8")
     return dashboard

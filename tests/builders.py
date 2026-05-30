@@ -75,3 +75,17 @@ def make_brownfield_repo(root: Path) -> Path:
     (root / "docs").mkdir(parents=True, exist_ok=True)
     (root / "docs" / "guide.md").write_text("# Guide\n\nSome guide text.")
     return root
+
+
+def make_large_repo(root: Path, n: int) -> Path:
+    """A repo whose markdown is large enough to exceed the size budget.
+
+    Each file carries a heading and a big body so the rendered island grows
+    with n. Use a small n for the warn band and a large n to force truncation.
+    """
+    docs = root / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    body = ("lorem ipsum dolor sit amet " * 400) + "\n"
+    for i in range(n):
+        (docs / f"big_{i:04d}.md").write_text(f"# Doc {i}\n\n{body}")
+    return root
