@@ -78,6 +78,15 @@ def test_redacts_compound_env_credential_names():
         assert n >= 1, line
 
 
+def test_redacts_quoted_key_json_assignment():
+    # JSON / config form, e.g. an .mcp.json snippet pasted into a doc
+    out, n = redact_text('{"PGPASSWORD": "s3cr3tpassword"}')
+    assert "s3cr3tpassword" not in out
+    assert n >= 1
+    out2, _ = redact_text('"api_key":"sk-livesecretvalue123"')
+    assert "sk-livesecretvalue123" not in out2
+
+
 def test_redacts_hard_secret_formats():
     aws, n1 = redact_text("id AKIAIOSFODNN7EXAMPLE here")
     assert "AKIAIOSFODNN7EXAMPLE" not in aws and n1 >= 1

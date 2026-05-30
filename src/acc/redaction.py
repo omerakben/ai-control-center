@@ -26,10 +26,12 @@ _HARD_FORMATS = [
 
 _SECRET_PATTERNS = [
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
-    # keyword assignment: capture an optional opening quote and redact a matching
-    # closing quote if present (\1?) — a closed value leaves no dangling quote,
-    # an unclosed value is still redacted.
-    re.compile(r"(?i)" + _KEYWORD + r"\s*[:=]\s*([\"']?)[^\s\"']{6,}\1?"),
+    # keyword assignment. The optional quote after the keyword catches the
+    # JSON / config form "PGPASSWORD": "value" (a quoted key whose closing quote
+    # would otherwise block the [:=]). The value group captures an optional
+    # opening quote and redacts a matching closing quote (\1?) — a closed value
+    # leaves no dangling quote, an unclosed value is still redacted.
+    re.compile(r"(?i)" + _KEYWORD + r"[\"']?\s*[:=]\s*([\"']?)[^\s\"']{6,}\1?"),
     # provider-prefixed keys, including multi-segment forms (sk-proj-…, sk_live_…,
     # xoxb-…-…): allow internal -/_ separators, >=10 body chars, no trailing-
     # separator over-match.

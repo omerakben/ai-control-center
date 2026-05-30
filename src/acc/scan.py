@@ -4,6 +4,9 @@ from pathlib import Path
 DEFAULT_EXCLUDES = {
     ".git", "node_modules", ".venv", "venv", "__pycache__",
     ".superpowers", ".remember", "dist", "build", ".next", "vendor",
+    # generated tool caches — their contents change between runs, so indexing
+    # them adds noise and breaks the byte-stable sourceDigest guarantee
+    ".pytest_cache", ".mypy_cache", ".ruff_cache",
 }
 
 
