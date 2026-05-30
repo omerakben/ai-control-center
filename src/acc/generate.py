@@ -332,6 +332,7 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
     # _escape_text_fields ran first, so todo["text"] is already escaped here — the
     # todo title enters the index uniformly escaped, like every other record.
     search = _build_search(inv, docs, project["openTodos"])  # reads the escaped fields (Phase 1 contract)
+    relationships = _build_relationships(inv, docs)  # reads docs' _refScanBody
     # Drop the private slice key so it never reaches the serialized island.
     for bucket in (inv, docs):
         for items in bucket.values():
@@ -359,7 +360,7 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
         "project": gpart["project"],
         "inventory": inv,
         "docs": docs,
-        "relationships": [],
+        "relationships": relationships,
         "search": search,
     }
     validate(data)

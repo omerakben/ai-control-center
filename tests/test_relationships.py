@@ -1,11 +1,14 @@
+import json
+
 from acc.adapters.base import ScanContext
 from acc.adapters.claude import ClaudeAdapter
 from acc.adapters.codex import CodexAdapter
 from acc.adapters.generic import GenericAdapter
-from acc.generate import _build_relationships
+from acc.generate import _build_relationships, generate
 from acc.adapters.base import make_item, empty_inventory, empty_docs
 from acc.ids import stable_id
-from tests.builders import make_brownfield_repo, make_claude_repo, make_codex_repo
+from tests.builders import (
+    make_brownfield_repo, make_claude_repo, make_codex_repo, make_multi_provider_repo)
 
 
 def _doc(doc_id, path, body):
@@ -95,3 +98,24 @@ def test_declares_excludes_commands():
     declares = [e for e in _build_relationships(inv, empty_docs())
                 if e["type"] == "declares"]
     assert declares == []
+
+
+def _island(html: str) -> dict:
+    marker = '<script id="acc-data" type="application/json">'
+    start = html.index(marker) + len(marker)
+    end = html.index("</script>", start)
+    return json.loads(html[start:end])
+
+
+def test_generate_populates_relationships_and_drops_private_fields(tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "links.md").write_text(
+        "# Links\n\nUses .claude/agents/reviewer.md and the figma server.")
+    html = generate(tmp_path).read_text(encoding="utf-8")
+    assert "_refScanBody" not in html and "_rawBody" not in html
+    data = _island(html)
+    assert isinstance(data["relationships"], list) and data["relationships"]
+    kinds = {e["type"] for e in data["relationships"]}
+    assert kinds <= {"reference", "declares"}
+    assert any(e["type"] == "reference" and e["evidence"] == ".claude/agents/reviewer.md"
+               for e in data["relationships"])
