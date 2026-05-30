@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import re
-from pathlib import Path
 from acc.generate import generate, detect_out_dir
 from tests.builders import make_multi_provider_repo, make_claude_repo, make_codex_repo, make_large_repo
 
@@ -161,7 +160,10 @@ def test_generate_digest_ignores_stale_other_dashboard(tmp_path):
     (tmp_path / ".claude").mkdir()
     (tmp_path / ".claude" / "dashboard.html").write_text("<stale>" * 100)
     second = generate(tmp_path, out_dir=out_dir).read_text(encoding="utf-8")
-    dig = lambda h: re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
+
+    def dig(h):
+        return re.search(r'"sourceDigest":"([0-9a-f]+)"', h).group(1)
+
     assert dig(first) == dig(second)
 
 

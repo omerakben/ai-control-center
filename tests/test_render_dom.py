@@ -46,7 +46,10 @@ def test_inventory_groups_by_type_with_chips(page, tmp_path):
 def test_search_filters_rows(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
-    visible = lambda: page.locator(".acc-item:not(.acc-hidden)").count()
+
+    def visible():
+        return page.locator(".acc-item:not(.acc-hidden)").count()
+
     before = visible()
     # "figma" matches exactly one item (the Cursor figma MCP server) in the
     # multi-provider fixture, so the visible count must strictly drop.
