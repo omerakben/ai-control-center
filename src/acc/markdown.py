@@ -12,7 +12,9 @@ def _safe_link(match: re.Match) -> str:
     label, url = match.group(1), match.group(2)
     parsed = urlparse(url)
     scheme = parsed.scheme.lower()
-    is_relative = not parsed.scheme and not url.startswith("//")
+    # Only http/https or repo-relative links. Reject any leading "/" so both
+    # protocol-relative ("//host") and root-relative ("/abs") URLs are blocked.
+    is_relative = not parsed.scheme and not url.startswith("/")
     if scheme in ("http", "https") or is_relative:
         return f'<a href="{url}">{label}</a>'
     return f"{label} ({url})"

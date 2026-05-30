@@ -24,3 +24,5 @@ __pycache__/
 
 # Node (if the generator gains a JS toolchain later)
 node_modules/
+dist/
+build/

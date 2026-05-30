@@ -28,3 +28,15 @@ def test_rel_posix_uses_forward_slashes(tmp_path):
     f.parent.mkdir(parents=True)
     f.write_text("hi")
     assert rel_posix(f, root) == "sub/a.md"
+
+
+def test_rel_posix_handles_symlinked_dir_under_root(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "a.md").write_text("x")
+    link = root / "lnk"
+    link.symlink_to(outside, target_is_directory=True)
+    # path is lexically under root via the symlink; its resolved path escapes root
+    assert rel_posix(link / "a.md", root) == "lnk/a.md"

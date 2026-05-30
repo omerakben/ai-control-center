@@ -42,3 +42,9 @@ def test_allows_relative_and_https_links():
 def test_renders_plus_bullet_list():
     html = render_markdown_safe("+ alpha\n+ beta")
     assert "<ul>" in html and "<li>alpha</li>" in html and "<li>beta</li>" in html
+
+
+def test_blocks_root_relative_links():
+    html = render_markdown_safe("[x](/etc/passwd)")
+    assert 'href="/etc/passwd"' not in html
+    assert "/etc/passwd" in html  # shown as text, not a link

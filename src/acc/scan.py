@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 DEFAULT_EXCLUDES = {
@@ -11,11 +12,16 @@ def scan_files(root: Path, excludes: set[str] | None = None) -> list[Path]:
         excludes = DEFAULT_EXCLUDES
     root = root.resolve()
     out: list[Path] = []
-    for p in root.rglob("*"):
-        if p.is_symlink() or not p.is_file():
-            continue
-        rel_parts = set(p.relative_to(root).parts)
-        if rel_parts & excludes:
-            continue
-        out.append(p)
+    # Top-down walk so excluded directories are pruned BEFORE descending (keeps
+    # node_modules/.git/etc. from being traversed at all). Only directory names
+    # are matched against excludes — a regular file named `vendor`/`build` is
+    # kept, unlike the old set(parts) filter which dropped it.
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        dirnames[:] = [d for d in dirnames if d not in excludes]
+        base = Path(dirpath)
+        for name in filenames:
+            p = base / name
+            if p.is_symlink() or not p.is_file():
+                continue
+            out.append(p)
     return sorted(out, key=lambda x: x.relative_to(root).as_posix())

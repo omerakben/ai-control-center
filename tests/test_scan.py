@@ -26,3 +26,14 @@ def test_scan_skips_symlinks(tmp_path):
     (tmp_path / "link.md").symlink_to(real)
     rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
     assert rels == ["real.md"]
+
+
+def test_scan_keeps_file_named_like_excluded_dir(tmp_path):
+    # a regular FILE whose name matches an excluded DIR must be kept
+    (tmp_path / "vendor").write_text("not a dir")
+    (tmp_path / "build").write_text("also a file")
+    (tmp_path / "keep.md").write_text("k")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert "vendor" in rels
+    assert "build" in rels
+    assert "keep.md" in rels

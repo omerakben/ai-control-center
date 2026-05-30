@@ -70,10 +70,11 @@ def generate(root: Path, out_dir: Path | None = None) -> Path:
         "generator": {"name": "ai-control-center", "version": __version__, "rendererDigest": ""},
         "source": {
             "repoName": root.name,
+            # dashboard and root are already resolved above — no need to re-resolve.
             "dashboardPath": (
-                dashboard.resolve().relative_to(root).as_posix()
-                if dashboard.resolve().is_relative_to(root)
-                else str(dashboard.resolve())
+                dashboard.relative_to(root).as_posix()
+                if dashboard.is_relative_to(root)
+                else str(dashboard)
             ),
             "sourceDigest": source_digest(files, root),
             "vcs": {"kind": "none"},

@@ -39,3 +39,25 @@ def test_allowlist_drops_unlisted_keys_and_redacts_values():
     assert "env" not in clean
     assert clean["command"] == "npx"
     assert "ghp_0123456789abcdefghij" not in " ".join(clean["args"])
+
+
+def test_redacts_closed_quote_without_dangling_quote():
+    # the closing quote must be redacted too — no `[redacted]"` left behind
+    out, n = redact_text('api_key = "abc123defXYZ"')
+    assert "abc123defXYZ" not in out
+    assert n >= 1
+    assert '"' not in out
+
+
+def test_redacts_unclosed_quote_assignment():
+    # a malformed/unclosed quote must STILL be redacted (no leak)
+    out, n = redact_text('api_key = "abc123defXYZ')
+    assert "abc123defXYZ" not in out
+    assert n >= 1
+
+
+def test_redacts_multi_segment_provider_tokens():
+    for token in ("sk-proj-abc123DEF456ghi", "sk_live_abc123DEF456ghi", "xoxb-123-456-abcdefghij"):
+        out, n = redact_text(f"key: {token}")
+        assert token not in out, token
+        assert n >= 1

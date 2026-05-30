@@ -6,9 +6,18 @@ _SECRET_PATTERNS = [
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{8,}"),
     re.compile(
         r"(?i)\b(?:api[_-]?key|secret|access[_-]?token|token|password|passwd|pwd|client[_-]?secret)\b"
-        r"\s*[:=]\s*[\"']?[^\s\"']{6,}"
+        # capture an optional opening quote and redact a matching closing quote
+        # if present (\1?) — so a closed value leaves no dangling quote, and an
+        # UNCLOSED value is still redacted (never matches less than before).
+        r"\s*[:=]\s*([\"']?)[^\s\"']{6,}\1?"
     ),
-    re.compile(r"\b(?:sk|pk|gho|ghp|ghs|xox[baprs])[-_][A-Za-z0-9]{10,}"),
+    re.compile(
+        # provider-prefixed keys, including multi-segment forms like sk-proj-…,
+        # sk_live_…, xoxb-…-…  (allow internal -/_ separators, >=10 body chars,
+        # no trailing separator over-match).
+        r"\b(?:sk|pk|gho|ghp|ghs|xox[baprs])[-_]"
+        r"(?=[A-Za-z0-9_-]{10,}\b)[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*\b(?![-_])"
+    ),
     re.compile(r"(?i)\b[a-z][a-z0-9+.\-]*://[^/\s:@]+:[^/\s:@]+@\S+"),
 ]
 
