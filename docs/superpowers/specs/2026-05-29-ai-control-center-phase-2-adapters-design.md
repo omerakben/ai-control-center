@@ -41,7 +41,7 @@ This is the stdlib-safe answer to reading frontmatter without PyYAML. The fields
 
 - `load_json(path) -> dict` for `.mcp.json`, `.claude/settings.json`, `.cursor/mcp.json`. Returns `{}` on missing or malformed input.
 - `load_toml(path) -> dict` over stdlib `tomllib` for `.codex/config.toml`. Returns `{}` on missing or malformed input.
-- `MCP_ALLOWED = {"command", "args", "transport", "url"}` and any other per-config-type allowlists. Loaders never raise on bad input; a broken config yields an empty result and a warning, not a crash.
+- `MCP_ALLOWED = {"command", "args", "type", "url"}` (`type` is the real MCP-config transport key — stdio/http/sse) and any other per-config-type allowlists. Loaders never raise on bad input, and `as_dict()` coerces a well-formed-but-wrong-shape container so a broken config yields an empty result, not a crash.
 
 ### Adapters
 
@@ -102,13 +102,13 @@ The owner dashboard always carries all detected providers in `providers[]` and t
 
 - `Item` gains `provider` (adapter id), `type` (native kind), and `typeLabel` (display string such as "Cursor rule"). It keeps `id`, `title`, `path`, `summary`.
 - The six inventory buckets are unchanged: `agents`, `skills`, `hooks`, `commands`, `mcpServers`, `rules`. Codex prompts live in `commands`.
-- MCP items expose `transport` and `url` only; auth, `env`, and `headers` never appear.
+- MCP items expose the `type` (transport) and `url` keys only; auth, `env`, and `headers` never appear.
 - `ProviderSummary` = `{id, displayName, root, detected}` plus optional non-secret config facts for Codex.
 - `validate()` extends with `assert_no_secrets(data)`: it serializes the assembled data and re-runs the prose secret scanner; any surviving match raises `ValueError`. This is a final tripwire over the new structured-config path, independent of each adapter remembering to redact.
 
 ### Redaction
 
-- Structured config (all MCP servers) is allowlisted to `{command, args, transport, url}`. Everything else is dropped before it can reach the output. This tier fails closed.
+- Structured config (all MCP servers) is allowlisted to `{command, args, type, url}`. Everything else is dropped before it can reach the output. This tier fails closed.
 - Hook commands and every frontmatter text field pass through `redact_text`.
 - The `assert_no_secrets` tripwire is the backstop if any path is missed.
 
@@ -116,7 +116,7 @@ The owner dashboard always carries all detected providers in `providers[]` and t
 
 TDD, stdlib `pytest`, hybrid in-test builders.
 
-- `tests/builders.py` — `make_claude_repo`, `make_codex_repo`, `make_cursor_repo`, `make_multi_provider_repo`, `make_brownfield_repo`, `make_non_git_repo`. Each stamps a realistic provider layout into `tmp_path`.
+- `tests/builders.py` — `make_claude_repo`, `make_codex_repo`, `make_cursor_repo`, `make_multi_provider_repo`, `make_brownfield_repo`. Each stamps a realistic provider layout into `tmp_path`. Every fixture is non-git by default (no `.git` is created), so the non-git path is the baseline rather than a separate builder.
 - `tests/test_frontmatter.py` — the parser: fenced and unfenced, quoted values, inline and block lists, booleans, malformed lines skipped.
 - `tests/test_claude_adapter.py`, `test_codex_adapter.py`, `test_cursor_adapter.py` — detection, inventory mapping, native labels, and that fake secrets in MCP config or prose do not leak.
 - `tests/test_owner_rule.py` — 0, 1, and 2-or-more existing dashboards; precedence; `--owner` override; the ambiguous error.
