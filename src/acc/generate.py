@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 _WARN_BYTES = 1_000_000
 _TRUNCATE_BYTES = 2_000_000
+# Cap on the per-item body slice appended to each search record's `text`.
+# Budget math vs _WARN_BYTES (1 MB): at ~500 indexable items, 500 * 200 =
+# 100 KB pre-escape — an order of magnitude under the warn line, so the slice
+# does not threaten the size budget. _reduce_for_size is the safety valve above
+# it (it drops the slice entirely). str slicing is codepoint-based, so a char
+# cap cuts cleanly on multibyte boundaries.
+_SEARCH_BODY_CHARS = 200
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
@@ -119,6 +126,18 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                         # (and the renderer) never sees a list/dict here
                         value = it[field]
                         it[field] = _html.escape(value if isinstance(value, str) else "")
+                # Capture a capped, escaped body slice on the SAME pass so the
+                # island stays uniformly escaped and the later _build_search reads
+                # escaped fields (Phase 1 contract). Source: a raw body if the
+                # adapter carries one, else the (now-escaped) summary. char-cap the
+                # RAW source before escaping so the visible length, not the
+                # entity-expanded one, is what _SEARCH_BODY_CHARS bounds.
+                raw = it.get("_rawBody")
+                if isinstance(raw, str) and raw:
+                    it["_searchBody"] = _html.escape(raw[:_SEARCH_BODY_CHARS])
+                else:
+                    # no raw body: reuse the already-escaped summary as the slice
+                    it["_searchBody"] = it.get("summary", "")
     project["title"] = _html.escape(project.get("title", ""))
     for todo in project.get("openTodos", []):
         if "text" in todo:

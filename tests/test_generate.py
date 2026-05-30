@@ -238,3 +238,21 @@ def test_todo_records_have_ids(tmp_path):
     data = _island(generate(tmp_path))
     todos = data["project"]["openTodos"]
     assert todos and all(t.get("id") and len(t["id"]) == 12 for t in todos)
+
+
+def test_search_body_char_cap_is_200():
+    from acc.generate import _SEARCH_BODY_CHARS
+    assert _SEARCH_BODY_CHARS == 200
+
+
+def test_escape_pass_caps_body_slice_multibyte_safe():
+    from acc.generate import _escape_text_fields, _SEARCH_BODY_CHARS
+    long_body = "héllo " * 100  # multibyte chars, well over the cap
+    inv = {"agents": [{"id": "i1", "title": "A", "path": "a.md",
+                       "summary": "s", "_rawBody": long_body}]}
+    docs = {"references": []}
+    project = {"title": "p", "openTodos": []}
+    _escape_text_fields(inv, docs, project)
+    slice_ = inv["agents"][0]["_searchBody"]
+    assert len(slice_) <= _SEARCH_BODY_CHARS          # char-capped
+    assert slice_ == long_body[:_SEARCH_BODY_CHARS]    # clean codepoint cut
