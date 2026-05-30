@@ -4,6 +4,7 @@ from acc.adapters.codex import CodexAdapter
 from acc.adapters.generic import GenericAdapter
 from acc.generate import _build_relationships
 from acc.adapters.base import make_item, empty_inventory, empty_docs
+from acc.ids import stable_id
 from tests.builders import make_brownfield_repo, make_claude_repo, make_codex_repo
 
 
@@ -64,3 +65,33 @@ def test_reference_dedup_and_boundary_and_unique():
         ".claude/agents/x.md and again .claude/agents/x.md but not .claude/agents/x.md.bak"))
     refs = [e for e in _build_relationships(inv, docs) if e["type"] == "reference"]
     assert len(refs) == 1 and refs[0]["to"] == a1["id"]
+
+
+def test_declares_edges_from_config_file_nodes():
+    inv = empty_inventory()
+    hook = make_item("claude", "hook", "Claude hook", "PreToolUse (Bash)",
+                     ".claude/settings.json", "echo hi")
+    mcp1 = make_item("claude", "mcpServer", "MCP server", "local",
+                     ".claude/settings.json", "node")
+    mcp2 = make_item("cursor", "mcpServer", "MCP server", "figma",
+                     ".cursor/mcp.json", "")
+    inv["hooks"].append(hook)
+    inv["mcpServers"].extend([mcp1, mcp2])
+    edges = _build_relationships(inv, empty_docs())
+    declares = [e for e in edges if e["type"] == "declares"]
+    settings_node = stable_id("config", "configFile", ".claude/settings.json", "")
+    cursor_node = stable_id("config", "configFile", ".cursor/mcp.json", "")
+    assert {(e["from"], e["to"], e["evidence"]) for e in declares} == {
+        (settings_node, hook["id"], ".claude/settings.json"),
+        (settings_node, mcp1["id"], ".claude/settings.json"),
+        (cursor_node, mcp2["id"], ".cursor/mcp.json"),
+    }
+
+
+def test_declares_excludes_commands():
+    inv = empty_inventory()
+    inv["commands"].append(make_item("claude", "command", "Claude command",
+                                     "ship", ".claude/commands/ship.md", ""))
+    declares = [e for e in _build_relationships(inv, empty_docs())
+                if e["type"] == "declares"]
+    assert declares == []

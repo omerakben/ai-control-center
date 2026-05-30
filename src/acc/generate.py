@@ -8,7 +8,7 @@ from .scan import scan_files
 from .digest import source_digest
 from .schema import SCHEMA_VERSION, validate
 from .render import render_html
-from .ids import rel_posix
+from .ids import rel_posix, stable_id
 from .adapters.base import ScanContext, empty_inventory, empty_docs, doc_type_label
 from .adapters.generic import GenericAdapter, harvest_todos
 from .adapters.claude import ClaudeAdapter
@@ -136,6 +136,18 @@ def _build_relationships(inv: dict, docs: dict) -> list[dict]:
                 if matchers[path].search(body):
                     edges.append({"from": doc["id"], "to": item_id,
                                   "type": "reference", "evidence": path})
+
+    # declares pass: config-file node -> each MCP server / hook it declares.
+    # Commands are file-discovered, not config-declared, so they are excluded.
+    config_items: dict[str, list[str]] = {}
+    for kind in ("mcpServers", "hooks"):
+        for it in inv.get(kind, []):
+            config_items.setdefault(it["path"], []).append(it["id"])
+    for config_path, item_ids in config_items.items():
+        node_id = stable_id("config", "configFile", config_path, "")
+        for item_id in item_ids:
+            edges.append({"from": node_id, "to": item_id,
+                          "type": "declares", "evidence": config_path})
 
     return _dedup_sort_edges(edges)
 
