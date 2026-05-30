@@ -11,7 +11,7 @@ _REQUIRED_TOP = {
 
 _SEARCH_KEYS = ("id", "type", "typeLabel", "title", "path", "text")
 _KNOWN_SEARCH_TYPES = {
-    "agent", "skill", "hook", "command", "mcpServer", "rule", "doc",
+    "agent", "skill", "hook", "command", "mcpServer", "rule", "doc", "todo",
 }
 
 

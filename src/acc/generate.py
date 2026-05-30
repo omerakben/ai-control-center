@@ -97,7 +97,7 @@ def _merge_parts(parts: list[dict]) -> tuple[dict, dict]:
     return inv, docs
 
 
-def _build_search(inv: dict, docs: dict) -> list[dict]:
+def _build_search(inv: dict, docs: dict, todos: list[dict]) -> list[dict]:
     records: list[dict] = []
     # Docs lack type/typeLabel (built by a separate adapter path keyed only by
     # bucket); synthesize a fixed type="doc" + a bucket-derived typeLabel so doc
@@ -110,6 +110,13 @@ def _build_search(inv: dict, docs: dict) -> list[dict]:
     for items in inv.values():
         for it in items:
             records.append(_search_record(it, it.get("type", ""), it.get("typeLabel", "")))
+    # TODOs are searchable+jumpable too (spec: every searchable item has a stable
+    # id). They carry {id,text,path} and no body — the (already-escaped) text is
+    # both the searchable and display title, so title=text and text="". type/
+    # typeLabel are fixed generator constants ("todo"/"TODO"), not author input.
+    for todo in todos:
+        records.append({"id": todo["id"], "type": "todo", "typeLabel": "TODO",
+                        "title": todo["text"], "path": todo["path"], "text": ""})
     # Explicit sort is load-bearing: render.py's json.dumps(sort_keys=True) sorts
     # dict keys but NOT list order, so determinism depends on this.
     records.sort(key=lambda r: (r["path"], r["title"], r["id"]))
@@ -254,7 +261,9 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
 
     inv, docs = _merge_parts(parts)
     _escape_text_fields(inv, docs, gpart["project"])  # escape titles/summaries for the island
-    search = _build_search(inv, docs)   # search reads the escaped fields (Phase 1 contract)
+    # _escape_text_fields ran first, so todo["text"] is already escaped here — the
+    # todo title enters the index uniformly escaped, like every other record.
+    search = _build_search(inv, docs, project["openTodos"])  # reads the escaped fields (Phase 1 contract)
     # Drop the private slice key so it never reaches the serialized island.
     for bucket in (inv, docs):
         for items in bucket.values():

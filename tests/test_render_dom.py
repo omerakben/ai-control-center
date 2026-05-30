@@ -270,6 +270,22 @@ def test_omnibox_light_index_note(page, tmp_path):
     assert "body search is off" in panel.inner_text().lower()
 
 
+def test_omnibox_finds_and_jumps_to_todo(page, tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] wire up CI pipeline\n")
+    page.set_content(_html(tmp_path))
+    page.fill("#acc-omnibox", "wire up CI")
+    page.wait_for_timeout(120)
+    panel = page.locator("#acc-omnibox-results")
+    grp = panel.locator(".acc-omni-group", has_text="TODO")
+    assert grp.count() == 1
+    assert grp.locator(".acc-omni-hit").count() >= 1
+    grp.locator(".acc-omni-hit").first.click()
+    flashed = page.locator(".acc-item.acc-flash")
+    assert flashed.count() == 1
+    assert "wire up ci pipeline" in flashed.inner_text().lower()
+
+
 def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))

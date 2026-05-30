@@ -275,13 +275,28 @@ def test_build_search_record_shape_and_doc_type_label(tmp_path):
     assert doc["typeLabel"] in {"Reference", "PRD", "ADR", "Decision", "Workflow"}
 
 
+def test_build_search_includes_todos(tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] wire up CI pipeline\n")
+    data = _island(generate(tmp_path))
+    todo_recs = [r for r in data["search"] if r["type"] == "todo"]
+    assert todo_recs, "TODOs must be in the search index"
+    r = todo_recs[0]
+    assert r["typeLabel"] == "TODO"
+    assert "wire up CI pipeline" in r["title"]
+    assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
+    # the todo id matches the rendered row id (jumpable)
+    todo_ids = {t["id"] for t in data["project"]["openTodos"]}
+    assert r["id"] in todo_ids
+
+
 def test_build_search_appends_escaped_body_slice():
     from acc.generate import _build_search
     inv = {"agents": [{"id": "i1", "type": "agent", "typeLabel": "Claude agent",
                        "title": "A", "path": "a.md", "summary": "sum",
                        "_searchBody": "BODYSLICE"}]}
     docs = {"references": []}
-    recs = _build_search(inv, docs)
+    recs = _build_search(inv, docs, [])
     assert recs[0]["text"] == "sum BODYSLICE"
 
 

@@ -207,7 +207,7 @@
   window.__accJump = jumpTo;
 
   var OMNI_GROUP_CAP = 8;
-  var INV_TYPE_ORDER = ["agent", "command", "skill", "hook", "mcpServer", "rule", "doc"];
+  var INV_TYPE_ORDER = ["agent", "command", "skill", "hook", "mcpServer", "rule", "doc", "todo"];
 
   function searchRecords() { return data.search || []; }
 
