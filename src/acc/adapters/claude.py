@@ -19,6 +19,25 @@ def _desc(fields: dict) -> str:
     return redact_text(d)[0] if isinstance(d, str) else ""
 
 
+def _classify(rel: str) -> str | None:
+    """Map a repo-relative path to its Claude inventory/doc kind, or None.
+
+    Classification happens here, before any file is read, so the scan's full
+    file list (which can span the whole repo) only incurs I/O for the files we
+    actually index. Keeping the path patterns in one place also stops the
+    dispatch in normalize() from drifting out of sync with the read filter.
+    """
+    if rel.startswith(".claude/agents/") and rel.endswith(".md"):
+        return "agent"
+    if rel.startswith(".claude/commands/") and rel.endswith(".md"):
+        return "command"
+    if rel.startswith(".claude/skills/") and rel.endswith("/SKILL.md"):
+        return "skill"
+    if rel == "CLAUDE.md" or (rel.startswith(".claude/") and rel.endswith("/CLAUDE.md")):
+        return "doc"
+    return None
+
+
 class ClaudeAdapter:
     id = "claude"
     display_name = "Claude Code"
@@ -36,28 +55,31 @@ class ClaudeAdapter:
 
         for p in ctx.files:
             rel = rel_posix(p, ctx.root)
+            kind = _classify(rel)
+            if kind is None:
+                continue  # filter on path first; most scanned files match nothing
             try:
                 raw = p.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
             stem = p.stem
 
-            if rel.startswith(".claude/agents/") and rel.endswith(".md"):
+            if kind == "agent":
                 fields, _ = parse_frontmatter(raw)
                 inv["agents"].append(make_item(
                     "claude", "agent", "Claude agent",
                     _title(fields, stem), rel, _desc(fields)))
-            elif rel.startswith(".claude/commands/") and rel.endswith(".md"):
+            elif kind == "command":
                 fields, _ = parse_frontmatter(raw)
                 inv["commands"].append(make_item(
                     "claude", "command", "Claude command",
                     _title(fields, stem), rel, _desc(fields)))
-            elif rel.startswith(".claude/skills/") and rel.endswith("/SKILL.md"):
+            elif kind == "skill":
                 fields, _ = parse_frontmatter(raw)
                 name = _title(fields, Path(rel).parent.name)
                 inv["skills"].append(make_item(
                     "claude", "skill", "Claude skill", name, rel, _desc(fields)))
-            elif rel == "CLAUDE.md" or (rel.startswith(".claude/") and rel.endswith("/CLAUDE.md")):
+            else:  # "doc" — CLAUDE.md at root or nested under .claude/
                 clean, _ = redact_text(raw)
                 heading = _first_heading(clean) or rel
                 docs["references"].append({

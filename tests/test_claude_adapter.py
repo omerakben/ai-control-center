@@ -1,7 +1,7 @@
 import json
 
 from acc.adapters.base import ScanContext
-from acc.adapters.claude import ClaudeAdapter
+from acc.adapters.claude import ClaudeAdapter, _classify
 from acc.scan import scan_files
 from tests.builders import make_claude_repo, make_brownfield_repo
 
@@ -76,6 +76,30 @@ def test_survives_wrong_shape_mcp_and_hooks(tmp_path):
     _, _, part = _normalize(tmp_path)
     assert part["inventory"]["mcpServers"] == []
     assert part["inventory"]["hooks"] == []
+
+
+def test_classify_matches_indexed_paths_only():
+    # path is classified before any read, so only indexed files incur I/O
+    assert _classify(".claude/agents/reviewer.md") == "agent"
+    assert _classify(".claude/commands/ship.md") == "command"
+    assert _classify(".claude/skills/pdf/SKILL.md") == "skill"
+    assert _classify("CLAUDE.md") == "doc"
+    assert _classify(".claude/nested/CLAUDE.md") == "doc"
+    # unrelated source files (the bulk of a repo) match nothing -> never read
+    assert _classify("src/app/main.py") is None
+    assert _classify("README.md") is None
+    assert _classify(".claude/settings.json") is None
+
+
+def test_normalize_defers_reads_for_unmatched_paths(tmp_path):
+    # a non-existent, non-Claude path in the file list must be skipped by the
+    # path filter before any read is attempted, so normalize never touches it
+    make_claude_repo(tmp_path)
+    ghost = tmp_path / "src" / "huge_binary.py"  # never created -> read would raise
+    ctx = ScanContext(root=tmp_path, files=scan_files(tmp_path) + [ghost])
+    ad = ClaudeAdapter()
+    part = ad.normalize(ctx, ad.detect(ctx)[0])
+    assert [a["title"] for a in part["inventory"]["agents"]] == ["reviewer"]
 
 
 def test_hooks_skips_nonstandard_entries(tmp_path):

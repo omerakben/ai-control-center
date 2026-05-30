@@ -1,4 +1,5 @@
 import json
+import logging
 from acc.config import load_json, load_toml, safe_mcp, MCP_ALLOWED
 
 
@@ -30,6 +31,30 @@ def test_load_toml_returns_empty_on_malformed(tmp_path):
     p = tmp_path / "bad.toml"
     p.write_text("this is = not [valid toml")
     assert load_toml(p) == {}
+
+
+def test_load_json_warns_on_malformed(tmp_path, caplog):
+    p = tmp_path / "bad.json"
+    p.write_text("{ not valid json")
+    with caplog.at_level(logging.WARNING):
+        assert load_json(p) == {}
+    assert "bad.json" in caplog.text
+
+
+def test_load_toml_warns_on_malformed(tmp_path, caplog):
+    p = tmp_path / "bad.toml"
+    p.write_text("this is = not [valid toml")
+    with caplog.at_level(logging.WARNING):
+        assert load_toml(p) == {}
+    assert "bad.toml" in caplog.text
+
+
+def test_missing_config_does_not_warn(tmp_path, caplog):
+    # absent config files are the common case — they must not produce noise
+    with caplog.at_level(logging.WARNING):
+        assert load_json(tmp_path / "nope.json") == {}
+        assert load_toml(tmp_path / "nope.toml") == {}
+    assert caplog.text == ""
 
 
 def test_safe_mcp_keeps_allowlisted_drops_env():

@@ -100,6 +100,18 @@ def test_generic_does_not_double_list_provider_files(tmp_path):
     assert ".claude/agents/reviewer.md" not in ref_paths
 
 
+def test_generate_preserves_provider_doc_todos(tmp_path):
+    # CLAUDE.md is claimed by the Claude adapter (which does not extract TODOs)
+    # and excluded from generic indexing — its open TODOs must still surface
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text(
+        "# Rules\n\n- [ ] wire up CI\n- [x] already done\n")
+    data = _island(generate(tmp_path))
+    todos = [t["text"] for t in data["project"]["openTodos"]]
+    assert "wire up CI" in todos
+    assert "already done" not in todos  # checked items are not open TODOs
+
+
 def test_generate_drops_mcp_env_secret(tmp_path):
     make_claude_repo(tmp_path)
     out = generate(tmp_path)

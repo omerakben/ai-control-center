@@ -6,13 +6,11 @@ from .schema import SCHEMA_VERSION, validate
 from .render import render_html
 from .ids import rel_posix
 from .adapters.base import ScanContext, empty_inventory, empty_docs
-from .adapters.generic import GenericAdapter
+from .adapters.generic import GenericAdapter, harvest_todos
 from .adapters.claude import ClaudeAdapter
 from .adapters.codex import CodexAdapter
 from .adapters.cursor import CursorAdapter
 from . import __version__
-
-_PROVIDER_DIRS = (".claude", ".codex", ".cursor")
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
@@ -138,10 +136,18 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
         provider_summaries.append(part["provider"])
 
     # generic indexes only the markdown not claimed by a provider folder/marker
-    unclaimed = [f for f in files if not _claimed_by_provider(rel_posix(f, root))]
+    claimed, unclaimed = [], []
+    for f in files:
+        (claimed if _claimed_by_provider(rel_posix(f, root)) else unclaimed).append(f)
     gctx = ScanContext(root=root, files=unclaimed)
     gadapter = GenericAdapter()
     gpart = gadapter.normalize(gctx, gadapter.detect(gctx)[0])
+    # Provider docs are dropped from generic doc indexing, but the open TODOs
+    # inside them still belong to the project — harvest them before the filter
+    # discards the files, then re-sort to keep output deterministic.
+    project = gpart["project"]
+    project["openTodos"].extend(harvest_todos(claimed, root))
+    project["openTodos"].sort(key=lambda t: (t["path"], t["text"]))
     parts.append(gpart)
     provider_summaries.append({"id": "generic", "displayName": "Generic",
                                "root": ".", "detected": True})
