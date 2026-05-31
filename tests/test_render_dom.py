@@ -467,3 +467,41 @@ def test_scroll_spy_activates_lower_section_on_scroll(page, tmp_path):
     active = page.locator("nav.acc-nav a.acc-nav-active")
     assert active.count() == 1
     assert active.first.get_attribute("data-spy") != "overview"
+
+
+# ---- v1.1.1 production-review fixes: escapes, summary cap, tables ----
+
+def test_agent_summary_is_lead_sentence_not_a_wall(page, tmp_path):
+    # a real-shaped agent: one double-quoted description line with \n and examples
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "rev.md").write_text(
+        '---\nname: bigdesc\n'
+        'description: "Use this agent for accessibility review of UI components. '
+        'Invoke proactively after edits.\\n\\nExamples:\\nuser: \\"Check the form\\""\n'
+        '---\n# Body\n')
+    page.set_content(_html(tmp_path))
+    summary = page.locator('.acc-item', has_text="bigdesc").first.locator('.acc-summary').inner_text()
+    assert summary.startswith("Use this agent for accessibility review of UI components.")
+    assert "Examples:" not in summary       # capped to the lead sentence
+    assert "\\n" not in summary             # no literal backslash-n
+    assert 'user: "Check' not in summary    # tail dropped
+
+
+def test_reading_pane_renders_markdown_table(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "t.md").write_text(
+        "---\nname: tabler\ndescription: short\n---\n"
+        "# Stack\n\n"
+        "| Technology | Version |\n| --- | --- |\n| React | 19 |\n| Next | 16 |\n")
+    page.set_content(_html(tmp_path))
+    row = page.locator('.acc-item', has_text="tabler").first
+    row.locator('.acc-toggle').click()
+    table = row.locator('.acc-detail table.acc-md-table')
+    assert table.count() == 1
+    assert table.locator('th', has_text="Technology").count() == 1
+    assert table.locator('td', has_text="React").count() == 1
+    assert table.locator('tbody tr').count() == 2   # two data rows, delimiter consumed
+    # the raw pipe row must not leak as a paragraph
+    assert "| --- |" not in row.locator('.acc-detail').inner_text()

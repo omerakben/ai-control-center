@@ -47,3 +47,25 @@ def test_malformed_lines_are_skipped_not_raised():
     assert fields["name"] == "ok"
     assert fields["model"] == "opus"
     assert ":::garbage:::" not in fields
+
+
+def test_double_quoted_escapes_are_decoded():
+    # real Claude agent descriptions are one double-quoted line with \n and \"
+    text = '---\ndescription: "Line one.\\n\\nExamples:\\nuser: \\"hi\\""\n---\nx'
+    fields, _ = parse_frontmatter(text)
+    assert fields["description"] == 'Line one.\n\nExamples:\nuser: "hi"'
+    assert "\\n" not in fields["description"]   # no literal backslash-n
+    assert '\\"' not in fields["description"]    # no literal backslash-quote
+
+
+def test_single_quoted_does_not_decode_backslashes():
+    # YAML single-quotes: only '' -> ', backslashes stay literal (e.g. a regex)
+    text = "---\npattern: 'a\\nb'\nname: 'O''Brien'\n---\nx"
+    fields, _ = parse_frontmatter(text)
+    assert fields["pattern"] == "a\\nb"          # backslash-n stays literal
+    assert fields["name"] == "O'Brien"           # '' collapses to one quote
+
+
+def test_unknown_double_quoted_escape_is_left_literal():
+    fields, _ = parse_frontmatter('---\nx: "a\\qb"\n---\ny')
+    assert fields["x"] == "a\\qb"                 # \q is not a known escape

@@ -5,7 +5,7 @@ from ..ids import rel_posix
 from ..redaction import redact_text
 from ..frontmatter import parse_frontmatter
 from ..config import load_json, safe_mcp, mcp_summary, as_dict
-from .generic import _first_heading, _first_paragraph, _strip_front_matter
+from .generic import _first_heading, _first_paragraph, _strip_front_matter, _lead_sentence
 
 
 def _title(fields: dict, fallback: str) -> str:
@@ -14,8 +14,11 @@ def _title(fields: dict, fallback: str) -> str:
 
 
 def _desc(fields: dict) -> str:
+    # Summaries are glanceable: keep the lead sentence (the full prompt body is in
+    # the reading pane). Cap then redact — the lead is short, and the full body is
+    # separately redacted where it is sourced.
     d = fields.get("description", "")
-    return redact_text(d)[0] if isinstance(d, str) else ""
+    return redact_text(_lead_sentence(d))[0] if isinstance(d, str) else ""
 
 
 def _classify(rel: str) -> str | None:

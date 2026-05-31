@@ -127,8 +127,17 @@
   // expose the inline renderer for DOM tests
   window.__accRenderInline = function (parent, escaped, q) { mdInline(parent, escaped, q); };
 
-  // Render block-level markdown (headings, lists, fenced code, paragraphs) of an
-  // ESCAPED island string into `container`. Used for the inline reading pane.
+  // A GFM table delimiter row is only pipes/colons/dashes/space and has both.
+  function isTableDelim(s) {
+    return s.indexOf("|") !== -1 && s.indexOf("-") !== -1 && /^[\s|:-]+$/.test(s);
+  }
+  function splitTableRow(s) {
+    return s.trim().replace(/^\|/, "").replace(/\|$/, "")
+      .split("|").map(function (c) { return c.trim(); });
+  }
+
+  // Render block-level markdown (headings, lists, fenced code, tables, paragraphs)
+  // of an ESCAPED island string into `container`. Used for the inline reading pane.
   function renderBlocks(container, escaped, qLower) {
     var lines = htmlUnescape(escaped).split("\n");
     var i = 0, list = null;
@@ -163,6 +172,34 @@
         renderInlineInto(item, li[1], qLower || "");
         list.appendChild(item);
         i++;
+        continue;
+      }
+      // GFM table: a header row immediately followed by a |---|---| delimiter.
+      if (line.indexOf("|") !== -1 && i + 1 < lines.length && isTableDelim(lines[i + 1])) {
+        flush();
+        var table = el("table", "acc-md-table");
+        var thead = el("thead"), htr = el("tr");
+        splitTableRow(line).forEach(function (cell) {
+          var th = el("th");
+          renderInlineInto(th, cell, qLower || "");
+          htr.appendChild(th);
+        });
+        thead.appendChild(htr);
+        table.appendChild(thead);
+        i += 2; // consume header + delimiter
+        var tbody = el("tbody");
+        while (i < lines.length && lines[i].indexOf("|") !== -1 && lines[i].trim() !== "") {
+          var tr = el("tr");
+          splitTableRow(lines[i]).forEach(function (cell) {
+            var td = el("td");
+            renderInlineInto(td, cell, qLower || "");
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+          i++;
+        }
+        table.appendChild(tbody);
+        container.appendChild(table);
         continue;
       }
       if (line.trim() === "") { flush(); i++; continue; }
