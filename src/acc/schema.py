@@ -70,7 +70,8 @@ def _scan_strings(obj) -> int:
     if isinstance(obj, str):
         return find_secrets(obj)
     if isinstance(obj, dict):
-        return sum(_scan_strings(v) for v in obj.values())
+        # scan KEYS as well as values — a dict key can be secret-shaped
+        return sum(_scan_strings(k) + _scan_strings(v) for k, v in obj.items())
     if isinstance(obj, list):
         return sum(_scan_strings(v) for v in obj)
     return 0
