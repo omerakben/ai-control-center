@@ -38,7 +38,7 @@ def _is_local_secret_file(name: str) -> bool:
         return True
     if low.startswith(".env.") and not low.endswith(_ENV_SAFE_SUFFIXES):
         return True
-    if low.startswith(".envrc."):
+    if low.startswith(".envrc.") and not low.endswith(_ENV_SAFE_SUFFIXES):
         return True
     return False
 

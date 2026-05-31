@@ -63,6 +63,18 @@ def test_scan_keeps_env_placeholder_files(tmp_path):
     assert set(rels) == {".env.example", ".env.sample", ".env.template", "keep.md"}
 
 
+def test_scan_envrc_placeholders_kept_secrets_dropped(tmp_path):
+    # the .env safe-suffix carve-out applies to .envrc.* too: placeholders stay,
+    # real direnv files (.envrc, .envrc.local) are excluded.
+    (tmp_path / ".envrc").write_text("export TOKEN=ghp_x")
+    (tmp_path / ".envrc.local").write_text("export TOKEN=ghp_y")
+    for name in (".envrc.example", ".envrc.sample", ".envrc.template"):
+        (tmp_path / name).write_text("export TOKEN=changeme")
+    (tmp_path / "keep.md").write_text("k")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert set(rels) == {".envrc.example", ".envrc.sample", ".envrc.template", "keep.md"}
+
+
 def test_scan_excludes_build_and_local_artifacts(tmp_path):
     # case-insensitive secret names, direnv, and build eggs feed source_digest
     # if scanned, so all are pruned. (`.env` as a directory is tested separately
