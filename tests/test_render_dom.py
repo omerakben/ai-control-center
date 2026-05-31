@@ -505,3 +505,29 @@ def test_reading_pane_renders_markdown_table(page, tmp_path):
     assert table.locator('tbody tr').count() == 2   # two data rows, delimiter consumed
     # the raw pipe row must not leak as a paragraph
     assert "| --- |" not in row.locator('.acc-detail').inner_text()
+
+
+def test_reading_pane_links_to_full_file_when_body_truncated(page, tmp_path):
+    # a body past the cap must end with an "open the full file" link, never silently
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    body = "# Big agent\n\n" + ("Lots of detail here. " * 400)  # well over _BODY_CHARS
+    (agents / "big.md").write_text("---\nname: bigbody\ndescription: short\n---\n" + body)
+    page.set_content(_html(tmp_path))
+    row = page.locator('.acc-item', has_text="bigbody").first
+    row.locator('.acc-toggle').click()
+    more = row.locator('.acc-detail .acc-detail-more')
+    assert more.count() == 1
+    link = more.locator('a', has_text="full file")
+    assert link.count() == 1
+    assert (link.first.get_attribute("href") or "").endswith(".claude/agents/big.md")
+
+
+def test_short_body_has_no_truncation_footer(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "small.md").write_text("---\nname: smallbody\ndescription: short\n---\n# Tiny\n\nDone.\n")
+    page.set_content(_html(tmp_path))
+    row = page.locator('.acc-item', has_text="smallbody").first
+    row.locator('.acc-toggle').click()
+    assert row.locator('.acc-detail-more').count() == 0

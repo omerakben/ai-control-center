@@ -234,7 +234,22 @@
       toggle.appendChild(el("span", "acc-toggle-label", "Read"));
       detail = el("div", "acc-detail acc-hidden");
       var openDetail = function () {
-        if (!built) { renderBlocks(detail, opts.body, ""); built = true; }
+        if (!built) {
+          renderBlocks(detail, opts.body, "");
+          // Capped body: never end silently — link to the full source file.
+          if (opts.bodyTruncated) {
+            var more = el("div", "acc-detail-more");
+            if (pathPrefix) {
+              var a = el("a", "acc-mdlink", "Preview only — open the full file →");
+              a.href = encodedRelHref(pathPrefix, opts.path);
+              more.appendChild(a);
+            } else {
+              more.appendChild(document.createTextNode("Preview only — open " + opts.path + " for the full file."));
+            }
+            detail.appendChild(more);
+          }
+          built = true;
+        }
         detail.classList.remove("acc-hidden");
         row.classList.add("acc-open");
         toggle.setAttribute("aria-expanded", "true");
@@ -315,7 +330,8 @@
         host.appendChild(itemRow({
           id: it.id,
           provider: it.provider, typeLabel: it.typeLabel,
-          title: it.title, path: it.path, summary: it.summary, body: it.body
+          title: it.title, path: it.path, summary: it.summary,
+          body: it.body, bodyTruncated: it.bodyTruncated
         }));
       });
     });
@@ -352,7 +368,7 @@
       items.forEach(function (doc) {
         wrap.appendChild(itemRow({
           id: doc.id, title: doc.title, path: doc.path,
-          summary: doc.summary, body: doc.body
+          summary: doc.summary, body: doc.body, bodyTruncated: doc.bodyTruncated
         }));
       });
       if (collapse) {
