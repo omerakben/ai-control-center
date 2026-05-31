@@ -28,10 +28,13 @@ jobs:
       - name: Regenerate the dashboard
         run: acc --root .
 
-      - name: Fail if the committed dashboard is stale
+      - name: Fail if the committed dashboard is stale or missing
         run: |
-          if ! git diff --quiet; then
-            echo "::error::dashboard.html is out of date — run /dashboard (or 'acc --root .') and commit the result."
+          # --porcelain catches a modified dashboard AND a never-committed
+          # (untracked) one, which `git diff --quiet` would miss on a fresh repo.
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::dashboard.html is out of date or missing — run /dashboard (or 'acc --root .') and commit the result."
+            git --no-pager status --porcelain
             git --no-pager diff
             exit 1
           fi

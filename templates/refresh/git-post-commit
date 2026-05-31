@@ -29,6 +29,11 @@ $ACC --root "$ROOT" >/dev/null 2>&1 \
 
 # Stage the refreshed dashboard for the next commit (a post-commit hook cannot
 # safely amend the commit in progress). The CI drift check catches any lag.
-git -C "$ROOT" add -- .claude/dashboard.html .codex/dashboard.html .cursor/dashboard.html 2>/dev/null || true
+# Stage each owner path on its own: a single `git add` with several pathspecs
+# aborts entirely when any one is missing, which would stage nothing in the
+# common single-provider repo. `.ai-control-center` is the generic-repo fallback.
+for d in .claude .codex .cursor .ai-control-center; do
+  git -C "$ROOT" add -- "$d/dashboard.html" 2>/dev/null || true
+done
 
 exit 0
