@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 from .scan import scan_files
 from .digest import source_digest
+from .redaction import redact_text
 from .schema import SCHEMA_VERSION, validate
 from .render import render_html
 from .ids import rel_posix, stable_id
@@ -226,24 +227,31 @@ def _search_record(it: dict, type_: str, type_label: str) -> dict:
             "title": it["title"], "path": it["path"], "text": text}
 
 
+def _redact_escape(value) -> str:
+    # Redact THEN escape every author-derived display string. Redaction is the
+    # security boundary: an adapter that derives a field from frontmatter (e.g. a
+    # title from a skill's `name:`) might not redact it, and these fields are
+    # plain text that bypasses render_markdown_safe, so the output tripwire — by
+    # design rendered-safe — would not catch a `&`/`<`-bearing value here.
+    # Redacting centrally closes that bypass for every display field uniformly.
+    return _html.escape(redact_text(value)[0] if isinstance(value, str) else "")
+
+
 def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
-    # Escape every author-derived plain-text display field so hostile content
-    # (script tags, onerror, </script>) can never reach the data island raw.
-    # The `html` field is already sanitized by render_markdown_safe — leave it.
-    # `provider`/`typeLabel`/`displayName` are NOT escaped here because they are
-    # generator-controlled constants (adapter ids and fixed labels), never
-    # author input. If a future adapter derives any of them from frontmatter,
-    # add it to the escape pass below.
+    # Redact + escape every author-derived plain-text display field so a secret
+    # never reaches the island and hostile content (script tags, onerror,
+    # </script>) can never reach it raw. The `html` field is already redacted
+    # (its source markdown is redacted before render) and sanitized by
+    # render_markdown_safe — leave it. `provider`/`typeLabel`/`displayName` are
+    # NOT touched here because they are generator-controlled constants (adapter
+    # ids and fixed labels), never author input. If a future adapter derives any
+    # of them from frontmatter, add it to the pass below.
     for bucket in (inv, docs):
         for items in bucket.values():
             for it in items:
                 for field in ("title", "summary"):
                     if field in it:
-                        # display fields are strings by contract; coerce any
-                        # wrong-shape leaf from a malformed config so escape
-                        # (and the renderer) never sees a list/dict here
-                        value = it[field]
-                        it[field] = _html.escape(value if isinstance(value, str) else "")
+                        it[field] = _redact_escape(it[field])
                 # Capture a capped, escaped body slice on the SAME pass so the
                 # island stays uniformly escaped and the later _build_search reads
                 # escaped fields (Phase 1 contract). Source: a raw body if the
@@ -256,14 +264,45 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                 # to the escaped summary); the branch is live plumbing for Phase 4b+.
                 raw = it.get("_rawBody")
                 if isinstance(raw, str) and raw:
-                    it["_searchBody"] = _html.escape(raw[:_SEARCH_BODY_CHARS])
+                    it["_searchBody"] = _redact_escape(raw[:_SEARCH_BODY_CHARS])
                 else:
-                    # no raw body: reuse the already-escaped summary as the slice
+                    # no raw body: reuse the already-redacted+escaped summary slice
                     it["_searchBody"] = it.get("summary", "")
-    project["title"] = _html.escape(project.get("title", ""))
+    project["title"] = _redact_escape(project.get("title", ""))
     for todo in project.get("openTodos", []):
         if "text" in todo:
-            todo["text"] = _html.escape(todo["text"])
+            todo["text"] = _redact_escape(todo["text"])
+
+
+def _redact_paths(data: dict) -> None:
+    # Paths are author-controlled — a filename can hold a secret-shaped string —
+    # and reach the island for links without going through render_markdown_safe,
+    # so the rendered-safe tripwire would not catch a `&`/`<`-bearing path. Redact
+    # them after relationships have matched on the raw paths. A normal path never
+    # matches a secret pattern, so links are unaffected; only a pathological
+    # secret-named file is masked. IDs are sha256 of the raw path, so they never
+    # leak it. Paths are textContent/URL-encoded by the renderer, so no escape.
+    for bucket in (data["inventory"], data["docs"]):
+        for items in bucket.values():
+            for it in items:
+                if isinstance(it.get("path"), str):
+                    it["path"] = redact_text(it["path"])[0]
+    for rec in data["search"]:
+        if isinstance(rec.get("path"), str):
+            rec["path"] = redact_text(rec["path"])[0]
+    for edge in data["relationships"]:
+        if isinstance(edge.get("evidence"), str):
+            edge["evidence"] = redact_text(edge["evidence"])[0]
+    for todo in data["project"].get("openTodos", []):
+        if isinstance(todo.get("path"), str):
+            todo["path"] = redact_text(todo["path"])[0]
+    # source.repoName / dashboardPath / pathPrefix derive from the repo's own dir
+    # and file names, which are author-controlled; sourceDigest is a hash and
+    # vcs.kind a constant, so leave those.
+    src = data.get("source", {})
+    for key in ("repoName", "dashboardPath", "pathPrefix"):
+        if isinstance(src.get(key), str):
+            src[key] = redact_text(src[key])[0]
 
 
 def _path_prefix(root: Path, out_dir: Path) -> str:
@@ -402,6 +441,7 @@ def generate_result(root: Path, out_dir: Path | None = None,
         "relationships": relationships,
         "search": search,
     }
+    _redact_paths(data)
     validate(data)
     html = render_html(data)
     size = len(html.encode("utf-8"))
