@@ -48,3 +48,14 @@ footer.acc-foot { padding: 16px; color: var(--muted); font-size: 11px; }
 mark { background: #ffe066; color: #1a1a1a; border-radius: 2px; padding: 0 1px; }
 @keyframes acc-flash-kf { from { background: #ffe066; } to { background: transparent; } }
 .acc-flash { animation: acc-flash-kf 1.6s ease-out; }
+.acc-related { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.acc-rel-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; background: none; border: 0; padding: 1px 0; font: inherit; color: var(--fg); text-align: left; }
+button.acc-rel-line { cursor: pointer; border-radius: 4px; }
+button.acc-rel-line:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.acc-rel-verb { text-transform: uppercase; letter-spacing: .04em; font-size: 10px; color: var(--muted); min-width: 88px; }
+.acc-rel-title { font-weight: 500; }
+#acc-crossref .acc-xref-source { display: flex; gap: 8px; align-items: baseline; margin: 12px 0 2px; font-weight: 600; }
+#acc-crossref .acc-xref-srctitle { font-weight: 600; }
+#acc-crossref .acc-xref-edge { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; width: 100%; padding: 2px 6px 2px 20px; background: none; border: 0; font: inherit; color: var(--fg); text-align: left; cursor: pointer; border-radius: 4px; }
+#acc-crossref .acc-xref-edge:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.acc-xref-empty { color: var(--muted); }

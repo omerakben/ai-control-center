@@ -289,6 +289,39 @@ def test_omnibox_finds_and_jumps_to_todo(page, tmp_path):
     assert "wire up ci pipeline" in flashed.inner_text().lower()
 
 
+def test_inline_related_is_bidirectional_and_jumps(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "links.md").write_text(
+        "# Links\n\nThe .claude/agents/reviewer.md agent handles reviews.")
+    page.set_content(_html(tmp_path))
+    agent_row = page.locator('.acc-item', has_text="reviewer").first
+    rel = agent_row.locator('.acc-related')
+    assert rel.count() == 1
+    assert rel.locator('button', has_text="referenced by").count() >= 1
+    # related controls are not indexable rows
+    assert agent_row.locator('.acc-related .acc-item').count() == 0
+    assert agent_row.locator('.acc-related [data-id]').count() == 0
+    # a declares label appears on an MCP server row, as text (not a jump button)
+    mcp_row = page.locator('#acc-inventory .acc-item', has_text="local").first
+    assert mcp_row.locator('.acc-related', has_text="declared in").count() == 1
+
+
+def test_crossref_view_grouped_by_source_and_sorted(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "links.md").write_text(
+        "# Links\n\nSee .claude/agents/reviewer.md.")
+    page.set_content(_html(tmp_path))
+    cross = page.locator("#acc-crossref")
+    assert cross.locator(".acc-xref-source", has_text=".claude/settings.json").count() == 1
+    assert cross.locator(".acc-xref-source", has_text=".cursor/mcp.json").count() == 1
+    src_headers = cross.locator(".acc-xref-source")
+    texts = [src_headers.nth(i).inner_text() for i in range(src_headers.count())]
+    assert texts == sorted(texts)  # display-sorted
+    cross.locator("button", has_text="reviewer").first.click()
+    flashed = page.locator("#acc-inventory .acc-item.acc-flash", has_text="reviewer")
+    assert flashed.count() == 1
+
+
 def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
     make_multi_provider_repo(tmp_path)
     page.set_content(_html(tmp_path))
@@ -299,3 +332,12 @@ def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
     bg = page.locator("#acc-omnibox-results mark").first.evaluate(
         "el => getComputedStyle(el).backgroundColor")
     assert bg not in ("rgba(0, 0, 0, 0)", "transparent")
+
+
+def test_degraded_mode_keeps_declares_and_renders(page, tmp_path):
+    # a repo large enough to trip the 2 MB truncate budget; declares edges are
+    # bounded, so the Cross-references view still renders its source groups.
+    make_multi_provider_repo(tmp_path)
+    make_large_repo(tmp_path, 200)
+    page.set_content(_html(tmp_path))
+    assert page.locator("#acc-crossref .acc-xref-source").count() >= 1

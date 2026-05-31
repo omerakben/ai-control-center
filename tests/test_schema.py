@@ -1,5 +1,6 @@
 import pytest
 from acc.schema import SCHEMA_VERSION, canonical_json, validate, assert_no_secrets
+from acc.ids import stable_id
 
 
 def _minimal_data() -> dict:
@@ -100,3 +101,51 @@ def test_validate_rejects_unknown_search_type():
     rec["type"] = "bogus"
     with pytest.raises(ValueError, match="search"):
         validate(_data_with_search(rec))
+
+
+def _base_data(relationships):
+    item_id = stable_id("claude", "mcpServer", ".claude/settings.json", "local")
+    doc_id = stable_id("claude", "doc", "CLAUDE.md", "My Project")
+    inv = {"agents": [], "skills": [], "hooks": [], "commands": [],
+           "mcpServers": [{"id": item_id, "provider": "claude", "type": "mcpServer",
+                           "typeLabel": "MCP server", "title": "local",
+                           "path": ".claude/settings.json", "summary": "node",
+                           "config": {}}],
+           "rules": []}
+    docs = {"prds": [], "adrs": [], "decisions": [], "workflows": [],
+            "references": [{"id": doc_id, "title": "My Project", "path": "CLAUDE.md",
+                            "summary": "", "html": ""}]}
+    return {
+        "schemaVersion": "1.0",
+        "generator": {"name": "x", "version": "0", "rendererDigest": "", "truncated": False},
+        "source": {"repoName": "r", "pathPrefix": "..", "dashboardPath": "d",
+                   "sourceDigest": "0", "vcs": {"kind": "none"}},
+        "providers": [], "project": {"title": "", "openTodos": []},
+        "inventory": inv, "docs": docs, "relationships": relationships, "search": [],
+    }, item_id, doc_id
+
+
+def test_valid_declares_and_reference_pass():
+    data, item_id, doc_id = _base_data([])
+    node = stable_id("config", "configFile", ".claude/settings.json", "")
+    data["relationships"] = [
+        {"from": node, "to": item_id, "type": "declares", "evidence": ".claude/settings.json"},
+        {"from": doc_id, "to": item_id, "type": "reference", "evidence": ".claude/settings.json"},
+    ]
+    validate(data)  # no raise
+
+
+@pytest.mark.parametrize("bad", [
+    {"from": "nope", "to": "nope", "type": "reference", "evidence": "x"},
+    {"from": "nope", "to": "__ITEM__", "type": "reference", "evidence": "x"},
+    {"from": "nope", "to": "__ITEM__", "type": "declares", "evidence": "x"},
+    {"from": "__DOC__", "to": "__ITEM__", "type": "owns", "evidence": "x"},
+    {"from": "__DOC__", "to": "__ITEM__", "type": "reference", "evidence": 5},
+])
+def test_invalid_relationship_rejected(bad):
+    data, item_id, doc_id = _base_data([])
+    edge = {k: (item_id if v == "__ITEM__" else doc_id if v == "__DOC__" else v)
+            for k, v in bad.items()}
+    data["relationships"] = [edge]
+    with pytest.raises(ValueError):
+        validate(data)

@@ -88,6 +88,7 @@ class ClaudeAdapter:
                     "path": rel,
                     "summary": _first_paragraph(clean),
                     "html": render_markdown_safe(clean),
+                    "_refScanBody": clean,
                 })
 
         inv["hooks"].extend(self._hooks(ctx.root))

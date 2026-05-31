@@ -359,3 +359,23 @@ def test_over_2mb_truncates_keeps_light_search(tmp_path):
     for r in data["search"]:
         assert r["text"] == ""
         assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
+
+
+def test_reduce_keeps_declares_caps_references():
+    from acc.generate import _reduce_for_size, _MAX_DEGRADED_REFERENCE_EDGES
+    refs = [{"from": f"d{i:04d}", "to": f"t{i:04d}", "type": "reference", "evidence": "p"}
+            for i in range(_MAX_DEGRADED_REFERENCE_EDGES + 50)]
+    decl = [{"from": "c", "to": f"m{i}", "type": "declares", "evidence": "cfg"}
+            for i in range(10)]
+    data = {
+        "inventory": {"agents": [], "skills": [], "hooks": [], "commands": [],
+                      "mcpServers": [], "rules": []},
+        "docs": {"references": [], "prds": [], "adrs": [], "decisions": [], "workflows": []},
+        "search": [], "generator": {"truncated": False},
+        "relationships": decl + refs,
+    }
+    reduced = _reduce_for_size(data)
+    kept = reduced["relationships"]
+    assert sum(1 for e in kept if e["type"] == "declares") == 10
+    assert sum(1 for e in kept if e["type"] == "reference") == _MAX_DEGRADED_REFERENCE_EDGES
+    assert kept == sorted(kept, key=lambda e: (e["from"], e["to"], e["type"]))

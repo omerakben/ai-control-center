@@ -117,6 +117,7 @@ class GenericAdapter:
                 "path": rel,
                 "summary": _first_paragraph(clean),
                 "html": render_markdown_safe(clean),
+                "_refScanBody": clean,
             })
             todos.extend(_extract_todos(clean, rel))
             if rel.lower() == "readme.md" and heading:
