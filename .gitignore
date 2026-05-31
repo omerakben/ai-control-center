@@ -2,6 +2,7 @@
 .remember/
 .superpowers/
 .serena/
+.direnv/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .playwright-mcp/
@@ -9,7 +10,11 @@
 # Secrets and env
 .env
 .env.*
+.envrc
+# placeholders carry no secrets and match scan's _ENV_SAFE_SUFFIXES carve-out
 !.env.example
+!.env.sample
+!.env.template
 
 # OS and editor cruft
 .DS_Store

@@ -61,3 +61,31 @@ def test_scan_keeps_env_placeholder_files(tmp_path):
     (tmp_path / "keep.md").write_text("k")
     rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
     assert set(rels) == {".env.example", ".env.sample", ".env.template", "keep.md"}
+
+
+def test_scan_excludes_build_and_local_artifacts(tmp_path):
+    # case-insensitive secret names, direnv, and build eggs feed source_digest
+    # if scanned, so all are pruned. (`.env` as a directory is tested separately
+    # because a case-insensitive FS cannot hold both `.ENV` and `.env` at once.)
+    (tmp_path / "keep.md").write_text("k")
+    (tmp_path / ".ENV").write_text("AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE")
+    (tmp_path / ".envrc").write_text("export TOKEN=ghp_x")
+    direnv = tmp_path / ".direnv"
+    direnv.mkdir()
+    (direnv / "cache").write_text("c")
+    egg = tmp_path / "ai_control_center.egg-info"
+    egg.mkdir()
+    (egg / "PKG-INFO").write_text("Metadata-Version: 2.1")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert rels == ["keep.md"]
+
+
+def test_scan_excludes_secret_named_directory(tmp_path):
+    # a `.env` used as a DIRECTORY (some secret-manager layouts) would otherwise
+    # be descended into and its contents hashed into the digest.
+    (tmp_path / "keep.md").write_text("k")
+    envdir = tmp_path / ".env"
+    envdir.mkdir()
+    (envdir / "credentials").write_text("SECRET=value")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert rels == ["keep.md"]
