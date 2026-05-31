@@ -46,9 +46,18 @@
   // leading "/" (root- or protocol-relative) and any non-http(s) scheme (e.g.
   // javascript:) are rejected so a link can never become a script sink.
   function safeUrl(url) {
-    var m = /^([a-z][a-z0-9+.\-]*):/i.exec(url);
+    var s = String(url);
+    // Browsers strip ASCII whitespace and C0/DEL control characters from an href
+    // before resolving the scheme, so a "\x01javascript:" or "java<TAB>script:" URL
+    // would smuggle a script scheme past a position-0 check. Reject any such char
+    // (anywhere) plus a leading slash/backslash, then validate the scheme on the
+    // exact value the browser would use. Markdown URLs never legitimately carry
+    // these (RE_LINK already forbids whitespace in the URL token).
+    if (/[\u0000-\u0020\u007f]/.test(s)) return false;
+    if (s.charAt(0) === "/" || s.charAt(0) === "\\") return false;
+    var m = /^([a-z][a-z0-9+.\-]*):/i.exec(s);
     if (m) return /^https?$/i.test(m[1]);
-    return url.charAt(0) !== "/";
+    return true;
   }
 
   // Append `logical` text into `target`, wrapping query matches in <mark>.
@@ -329,22 +338,21 @@
     });
   }
 
-  var TODO_CAP = 50;
-
   function renderTodos() {
     var host = document.getElementById("acc-todos");
     var todos = (data.project && data.project.openTodos) || [];
     if (!todos.length) { host.appendChild(emptyNote("todos")); return; }
+    // Render EVERY TODO (so the omnibox can jump to any of them) inside a
+    // height-capped scroll box, so a long list is bounded — not an endless wall.
+    if (todos.length > 50) {
+      host.appendChild(el("div", "acc-more",
+        todos.length + " open TODOs — the list scrolls; press / to search across them."));
+    }
     var box = el("div", "acc-todos");
-    todos.slice(0, TODO_CAP).forEach(function (t) {
+    todos.forEach(function (t) {
       box.appendChild(itemRow({ id: t.id, title: t.text, path: t.path }));
     });
     host.appendChild(box);
-    if (todos.length > TODO_CAP) {
-      host.appendChild(el("div", "acc-more",
-        "Showing " + TODO_CAP + " of " + todos.length +
-        " — press / and search to jump to a specific TODO."));
-    }
   }
 
   function renderHead() {

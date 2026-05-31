@@ -426,14 +426,34 @@ def test_overview_todo_card_matches_section_text(page, tmp_path):
     assert card_line.strip() == row_title.strip()
 
 
-def test_todos_section_caps_with_more_line(page, tmp_path):
+def test_todos_render_all_in_scroll_box_and_remain_jumpable(page, tmp_path):
+    # all TODOs render (so the omnibox can jump to any), bounded by a scroll box
     (tmp_path / ".claude").mkdir()
     body = "# Rules\n\n" + "".join("- [ ] task number %d\n" % i for i in range(70))
     (tmp_path / "CLAUDE.md").write_text(body)
     page.set_content(_html(tmp_path))
-    assert page.locator("#acc-todos .acc-item").count() == 50
-    more = page.locator("#acc-todos .acc-more")
-    assert more.count() == 1 and "of 70" in more.inner_text()
+    box = page.locator("#acc-todos .acc-todos")
+    assert box.count() == 1
+    assert box.locator(".acc-item").count() == 70  # every TODO rendered
+    assert box.evaluate("el => getComputedStyle(el).overflowY") in ("auto", "scroll")
+    # a TODO past any visual fold is still reachable via the omnibox
+    page.fill("#acc-omnibox", "task number 69")
+    page.wait_for_timeout(120)
+    page.locator("#acc-omnibox-results .acc-omni-hit").first.click()
+    flashed = page.locator(".acc-item.acc-flash")
+    assert flashed.count() == 1 and "task number 69" in flashed.inner_text()
+
+
+def test_markdown_control_char_link_is_neutralized(page, tmp_path):
+    # a C0 control char before the scheme must not smuggle a live javascript: href
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "c.md").write_text(
+        '---\nname: clink\ndescription: "x [run](\x01javascript:window.__c0=1)"\n---\n')
+    page.set_content(_html(tmp_path))
+    summary = page.locator('.acc-item', has_text="clink").first.locator('.acc-summary')
+    assert summary.locator('a').count() == 0       # control-char url rejected
+    assert page.evaluate("() => window.__c0") is None
 
 
 def test_scroll_spy_activates_lower_section_on_scroll(page, tmp_path):
