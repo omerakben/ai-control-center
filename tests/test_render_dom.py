@@ -260,11 +260,12 @@ def test_omnibox_hostile_body_is_inert(page, tmp_path):
 
 
 def test_omnibox_light_index_note(page, tmp_path):
-    # 150 big docs exceed the 2 MB budget -> summary-only truncation -> light
-    # index (every search record's body text is blanked). make_large_repo only
-    # yields docs titled "Doc N" at docs/big_NNNN.md, so we query a unique path
-    # fragment; names+paths stay searchable while the body-off note is shown.
-    make_large_repo(tmp_path, 150)
+    # Enough big docs that graduated truncation runs past dropping bodies and
+    # capping summaries all the way to the search-body step, where the index goes
+    # light. make_large_repo yields docs titled "Doc N" at docs/big_NNNN.md, so we
+    # query a unique path fragment; names+paths stay searchable while the body-off
+    # note is shown.
+    make_large_repo(tmp_path, 300)
     page.set_content(_html(tmp_path))
     page.fill("#acc-omnibox", "big_0001")
     page.wait_for_timeout(120)
@@ -341,3 +342,128 @@ def test_degraded_mode_keeps_declares_and_renders(page, tmp_path):
     make_large_repo(tmp_path, 200)
     page.set_content(_html(tmp_path))
     assert page.locator("#acc-crossref .acc-xref-source").count() >= 1
+
+
+# ---- v1.1.0 UI/UX pass: markdown rendering, reading pane, empty states ----
+
+def test_markdown_renders_bold_code_link_not_literal(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "md.md").write_text(
+        '---\nname: mdagent\n'
+        'description: "Use **const** over `let`; see [docs](https://x.test)."\n---\n# Body\n')
+    page.set_content(_html(tmp_path))
+    summary = page.locator('.acc-item', has_text="mdagent").first.locator('.acc-summary')
+    assert summary.locator('strong', has_text="const").count() == 1
+    assert summary.locator('code', has_text="let").count() == 1
+    link = summary.locator('a.acc-mdlink', has_text="docs")
+    assert link.count() == 1 and link.first.get_attribute("href") == "https://x.test"
+    assert "**const**" not in summary.inner_text()  # no raw markers
+
+
+def test_markdown_hostile_summary_is_inert(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "x.md").write_text(
+        '---\nname: pwn2\n'
+        'description: "</script><img src=x onerror=window.__pwn2=1> and **bold**"\n---\n')
+    page.set_content(_html(tmp_path))
+    row = page.locator('.acc-item', has_text="pwn2").first
+    assert row.locator('img').count() == 0
+    assert page.evaluate("() => window.__pwn2") is None
+    assert row.locator('.acc-summary strong', has_text="bold").count() == 1  # md still works
+
+
+def test_markdown_javascript_link_is_neutralized(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "j.md").write_text(
+        '---\nname: jlink\ndescription: "click [here](javascript:window.__js=1)"\n---\n')
+    page.set_content(_html(tmp_path))
+    summary = page.locator('.acc-item', has_text="jlink").first.locator('.acc-summary')
+    assert summary.locator('a').count() == 0           # no anchor for unsafe scheme
+    assert "javascript:" in summary.inner_text()       # degraded to plain text
+    assert page.evaluate("() => window.__js") is None
+
+
+def test_reading_pane_expands_and_renders_body(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "r.md").write_text(
+        "---\nname: reader\ndescription: short\n---\n"
+        "# Heading\n\nA **bold** body line.\n\n- item one\n")
+    page.set_content(_html(tmp_path))
+    row = page.locator('.acc-item', has_text="reader").first
+    detail = row.locator('.acc-detail')
+    assert detail.count() == 1
+    assert detail.first.evaluate("el => el.classList.contains('acc-hidden')")  # collapsed
+    row.locator('.acc-toggle').click()
+    assert not detail.first.evaluate("el => el.classList.contains('acc-hidden')")
+    assert detail.locator('h1', has_text="Heading").count() == 1
+    assert detail.locator('strong', has_text="bold").count() == 1
+    assert detail.locator('li', has_text="item one").count() == 1
+
+
+def test_empty_inventory_has_graceful_note(page, tmp_path):
+    (tmp_path / "README.md").write_text("# Readme\n\nNo providers here.")
+    (tmp_path / "AGENTS.md").write_text("# Guide\n\n- [ ] do a thing\n")  # doc, no inventory
+    page.set_content(_html(tmp_path))
+    inv = page.locator("#acc-inventory")
+    assert inv.locator(".acc-empty").count() == 1
+    assert "no agents" in inv.locator(".acc-empty").inner_text().lower()
+    assert inv.locator(".acc-item").count() == 0  # empty note is not an indexable row
+
+
+def test_overview_todo_card_matches_section_text(page, tmp_path):
+    # escape-consistency: the Overview TODO preview equals the TODOs-section row
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text(
+        "# Rules\n\n- [ ] handle the `<os>` case in **build**\n")
+    page.set_content(_html(tmp_path))
+    card_line = page.locator("#acc-overview .acc-card-todos .acc-card-line").first.inner_text()
+    row_title = page.locator("#acc-todos .acc-item .acc-itemtitle").first.inner_text()
+    assert "<os>" in card_line and "&lt;os&gt;" not in card_line  # decoded, not double-escaped
+    assert card_line.strip() == row_title.strip()
+
+
+def test_todos_render_all_in_scroll_box_and_remain_jumpable(page, tmp_path):
+    # all TODOs render (so the omnibox can jump to any), bounded by a scroll box
+    (tmp_path / ".claude").mkdir()
+    body = "# Rules\n\n" + "".join("- [ ] task number %d\n" % i for i in range(70))
+    (tmp_path / "CLAUDE.md").write_text(body)
+    page.set_content(_html(tmp_path))
+    box = page.locator("#acc-todos .acc-todos")
+    assert box.count() == 1
+    assert box.locator(".acc-item").count() == 70  # every TODO rendered
+    assert box.evaluate("el => getComputedStyle(el).overflowY") in ("auto", "scroll")
+    # a TODO past any visual fold is still reachable via the omnibox
+    page.fill("#acc-omnibox", "task number 69")
+    page.wait_for_timeout(120)
+    page.locator("#acc-omnibox-results .acc-omni-hit").first.click()
+    flashed = page.locator(".acc-item.acc-flash")
+    assert flashed.count() == 1 and "task number 69" in flashed.inner_text()
+
+
+def test_markdown_control_char_link_is_neutralized(page, tmp_path):
+    # a C0 control char before the scheme must not smuggle a live javascript: href
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "c.md").write_text(
+        '---\nname: clink\ndescription: "x [run](\x01javascript:window.__c0=1)"\n---\n')
+    page.set_content(_html(tmp_path))
+    summary = page.locator('.acc-item', has_text="clink").first.locator('.acc-summary')
+    assert summary.locator('a').count() == 0       # control-char url rejected
+    assert page.evaluate("() => window.__c0") is None
+
+
+def test_scroll_spy_activates_lower_section_on_scroll(page, tmp_path):
+    make_multi_provider_repo(tmp_path)
+    (tmp_path / "docs" / "big.md").write_text("# Big\n\n" + ("filler paragraph. " * 1500))
+    page.set_viewport_size({"width": 1000, "height": 600})
+    page.set_content(_html(tmp_path))
+    page.wait_for_timeout(150)
+    page.evaluate("() => document.getElementById('crossref').scrollIntoView({block:'start'})")
+    page.wait_for_timeout(300)
+    active = page.locator("nav.acc-nav a.acc-nav-active")
+    assert active.count() == 1
+    assert active.first.get_attribute("data-spy") != "overview"

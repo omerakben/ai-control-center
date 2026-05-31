@@ -14,7 +14,10 @@ def test_generic_extracts_docs_and_headings(tmp_path):
     assert len(refs) == 1
     assert refs[0]["title"] == "Notes"
     assert refs[0]["path"] == "notes.md"
-    assert "<p>Some body text.</p>" in refs[0]["html"]
+    # docs carry the full clean markdown in _refScanBody (the reading-body and
+    # relationship-scan source); no server-rendered `html` is shipped anymore.
+    assert "html" not in refs[0]
+    assert "Some body text." in refs[0]["_refScanBody"]
 
 
 def test_generic_collects_open_todos(tmp_path):

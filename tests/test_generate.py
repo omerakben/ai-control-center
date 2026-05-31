@@ -203,20 +203,26 @@ def test_generator_truncated_defaults_false(tmp_path):
     assert data["generator"]["truncated"] is False
 
 
-def test_over_2mb_truncates_to_summary_only(tmp_path):
+def test_over_2mb_truncates_sheds_bodies_first(tmp_path):
     make_claude_repo(tmp_path)        # real inventory items (agent/command/skill/hook/mcp)
     make_large_repo(tmp_path, 150)    # bulk docs to exceed 2 MB
     data = _island(generate(tmp_path))
     assert data["generator"]["truncated"] is True
-    assert data["search"] and all(r["text"] == "" for r in data["search"])
+    # graduated trim names what it dropped, and the reading body is always first
+    steps = data["generator"].get("reducedSteps")
+    assert steps and steps[0] == "bodies"
+    # the per-item reading body is gone (the dominant cost); shape intact
     for d in data["docs"]["references"]:
-        assert d["summary"] == "" and d["html"] == ""
-        assert "id" in d and "title" in d and "path" in d  # shape intact
-    # inventory summaries are blanked too (heaviest non-doc strings)
+        assert d.get("body", "") == ""
+        assert "id" in d and "title" in d and "path" in d
     inv_items = [it for bucket in data["inventory"].values() for it in bucket]
-    assert inv_items, "fixture must have inventory to test inventory blanking"
+    assert inv_items, "fixture must have inventory to exercise body shedding"
     for it in inv_items:
-        assert it["summary"] == ""
+        assert it.get("body", "") == ""
+    # the search index still exists (names + paths at minimum) and is well-formed
+    assert data["search"]
+    for r in data["search"]:
+        assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
 
 
 def test_between_1_and_2mb_warns_and_keeps_full(tmp_path, caplog):
@@ -224,8 +230,25 @@ def test_between_1_and_2mb_warns_and_keeps_full(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         data = _island(generate(tmp_path))
     assert data["generator"]["truncated"] is False
-    assert any(d["html"] for d in data["docs"]["references"])  # full kept
+    # full (non-truncated) keeps the readable body on docs; no server html field
+    assert any(d.get("body") for d in data["docs"]["references"])
+    assert all("html" not in d for d in data["docs"]["references"])
     assert "exceeds" in caplog.text
+
+
+def test_doc_body_is_redacted_capped_and_no_html(tmp_path):
+    from acc.generate import _BODY_CHARS
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text(
+        "# Rules\n\nUse **const** over `let`. Secret: ghp_0123456789abcdefghij\n"
+        + ("padding line to grow the body. " * 400))
+    data = _island(generate(tmp_path))
+    doc = next(d for d in data["docs"]["references"] if d["path"] == "CLAUDE.md")
+    assert "html" not in doc                     # html field dropped from island
+    assert doc["body"]                            # readable body present
+    assert len(doc["body"]) <= _BODY_CHARS + 32   # capped (+slack for entity expansion)
+    assert "ghp_0123456789abcdefghij" not in doc["body"]  # redacted at source
+    assert "**const**" in doc["body"]             # raw markdown preserved for client render
 
 
 def test_small_repo_not_truncated(tmp_path):
@@ -327,38 +350,69 @@ def test_private_search_body_key_not_in_island(tmp_path):
     assert "_searchBody" not in html
 
 
-def test_reduce_keeps_light_index_without_body():
-    from acc.generate import _reduce_for_size
-    data = {
+def _reducible(**over):
+    """A minimal data dict for direct _reduce_for_size unit tests."""
+    return {
         "schemaVersion": "1.0",
         "generator": {"truncated": False},
-        "inventory": {"agents": [], "skills": [], "hooks": [], "commands": [],
-                      "mcpServers": [], "rules": []},
-        "docs": {"prds": [], "adrs": [], "decisions": [], "workflows": [], "references": []},
+        "inventory": {"agents": [{"id": "i1", "title": "A", "path": "a.md",
+                                  "summary": "a-summary-xxxxxxxxxx", "body": "ABODY"}],
+                      "skills": [], "hooks": [], "commands": [], "mcpServers": [], "rules": []},
+        "docs": {"references": [{"id": "i2", "title": "B", "path": "b.md",
+                                 "summary": "b-summary-yyyyyyyyyy", "body": "BBODY"}],
+                 "prds": [], "adrs": [], "decisions": [], "workflows": []},
         "search": [
             {"id": "i1", "type": "agent", "typeLabel": "Claude agent",
              "title": "A", "path": "a.md", "text": "sum BODY"},
             {"id": "i2", "type": "doc", "typeLabel": "Reference",
              "title": "B", "path": "b.md", "text": "docsum BODY"},
         ],
+        **over,
     }
-    reduced = _reduce_for_size(data)
-    assert len(reduced["search"]) == 2          # not emptied
+
+
+def test_reduce_step1_drops_only_bodies_when_that_suffices():
+    from acc.generate import _reduce_for_size
+    data = _reducible()
+    # measure says "already under budget", so only step 1 (bodies) fires
+    reduced = _reduce_for_size(data, lambda d: 0)
+    assert reduced["generator"]["reducedSteps"] == ["bodies"]
+    for it in reduced["docs"]["references"] + reduced["inventory"]["agents"]:
+        assert it["body"] == ""              # bodies shed
+        assert it["summary"]                 # summaries KEPT (the win over all-or-nothing)
     for r in reduced["search"]:
-        assert r["text"] == ""                   # body dropped
-        assert set(r.keys()) == {"id", "type", "typeLabel", "title", "path", "text"}
-    assert reduced["search"][0]["title"] == "A"  # names + paths kept
+        assert r["text"] != ""               # body search KEPT
 
 
-def test_over_2mb_truncates_keeps_light_search(tmp_path):
-    make_claude_repo(tmp_path)
-    make_large_repo(tmp_path, 150)  # forces summary-only
-    data = _island(generate(tmp_path))
-    assert data["generator"]["truncated"] is True
-    assert data["search"], "light index must survive truncation"
-    for r in data["search"]:
+def test_reduce_runs_all_steps_when_never_under_budget():
+    from acc.generate import _reduce_for_size
+    data = _reducible()
+    # measure always over budget -> every step fires, in order
+    reduced = _reduce_for_size(data, lambda d: 10**9)
+    assert reduced["generator"]["reducedSteps"] == [
+        "bodies", "summaries-capped", "search-body", "summaries-blanked"]
+    for it in reduced["docs"]["references"] + reduced["inventory"]["agents"]:
+        assert it["body"] == "" and it["summary"] == ""
+    for r in reduced["search"]:
         assert r["text"] == ""
-        assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
+        assert set(r.keys()) == {"id", "type", "typeLabel", "title", "path", "text"}
+
+
+def test_reduce_caps_summaries_before_blanking():
+    from acc.generate import _reduce_for_size, _TRUNCATED_SUMMARY_CHARS
+    long = "x" * (_TRUNCATED_SUMMARY_CHARS + 500)
+    data = _reducible()
+    data["docs"]["references"][0]["summary"] = long
+    # one call: bodies+cap gets us under budget on the 2nd measure
+    calls = {"n": 0}
+
+    def measure(d):
+        calls["n"] += 1
+        return 10**9 if calls["n"] <= 1 else 0  # over after step 1, under after step 2
+
+    reduced = _reduce_for_size(data, measure)
+    assert reduced["generator"]["reducedSteps"] == ["bodies", "summaries-capped"]
+    assert len(reduced["docs"]["references"][0]["summary"]) == _TRUNCATED_SUMMARY_CHARS
 
 
 def test_reduce_keeps_declares_caps_references():
@@ -374,7 +428,7 @@ def test_reduce_keeps_declares_caps_references():
         "search": [], "generator": {"truncated": False},
         "relationships": decl + refs,
     }
-    reduced = _reduce_for_size(data)
+    reduced = _reduce_for_size(data, lambda d: 0)
     kept = reduced["relationships"]
     assert sum(1 for e in kept if e["type"] == "declares") == 10
     assert sum(1 for e in kept if e["type"] == "reference") == _MAX_DEGRADED_REFERENCE_EDGES

@@ -3,7 +3,6 @@ from pathlib import Path
 from .base import ScanContext, ProviderRoot
 from ..ids import stable_id, rel_posix
 from ..redaction import redact_text
-from ..markdown import render_markdown_safe
 
 _TODO = re.compile(r"^\s*[-*+]\s*\[ \]\s*(.+)$")
 _HEADING = re.compile(r"^\s*#{1,6}\s+(.*)$")
@@ -116,7 +115,9 @@ class GenericAdapter:
                 "title": heading,
                 "path": rel,
                 "summary": _first_paragraph(clean),
-                "html": render_markdown_safe(clean),
+                # _refScanBody (the full redacted markdown) feeds both the
+                # relationship scan and the inline reading `body`; no server
+                # `html` is shipped — the client renders the body to DOM.
                 "_refScanBody": clean,
             })
             todos.extend(_extract_todos(clean, rel))

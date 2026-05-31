@@ -56,4 +56,4 @@ def test_template_has_crossref_section_and_nav(tmp_path):
     html = generate(tmp_path).read_text(encoding="utf-8")
     assert 'id="crossref"' in html
     assert 'id="acc-crossref"' in html
-    assert '<a href="#crossref">Cross-references</a>' in html
+    assert 'href="#crossref"' in html and ">Cross-references<" in html

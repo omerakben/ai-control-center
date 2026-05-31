@@ -3,6 +3,7 @@ from ..ids import rel_posix
 from ..redaction import redact_text
 from ..frontmatter import parse_frontmatter
 from ..config import load_json, safe_mcp, mcp_summary, as_dict
+from .generic import _strip_front_matter
 
 
 class CursorAdapter:
@@ -30,12 +31,19 @@ class CursorAdapter:
                 fields, _ = parse_frontmatter(raw)
                 desc = fields.get("description", "")
                 summary = redact_text(desc)[0] if isinstance(desc, str) else ""
-                inv["rules"].append(make_item(
-                    "cursor", "rule", "Cursor rule", p.stem, rel, summary))
+                item = make_item("cursor", "rule", "Cursor rule", p.stem, rel, summary)
+                item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                inv["rules"].append(item)
             elif rel == ".cursorrules":
-                inv["rules"].append(make_item(
-                    "cursor", "rule", "Cursor rule", ".cursorrules", rel,
-                    "Legacy single-file Cursor rules"))
+                try:
+                    raw = p.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    raw = ""
+                item = make_item("cursor", "rule", "Cursor rule", ".cursorrules", rel,
+                                 "Legacy single-file Cursor rules")
+                if raw:
+                    item["_rawBody"] = redact_text(raw)[0]
+                inv["rules"].append(item)
 
         servers = as_dict(load_json(ctx.root / ".cursor" / "mcp.json").get("mcpServers"))
         for name, cfg in servers.items():
