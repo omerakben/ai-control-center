@@ -33,11 +33,11 @@ The current branch `feature/phase-4a-find` was cut from a commit **before** Phas
 **Files:**
 - Modify (git history only): branch `feature/phase-4a-find` (currently at `89a2fa5`, parent chain ends at `17bb59a`; Phase 3 lives on `feature/phase-3-renderer` tip `32bf625`).
 
-- [ ] Confirm the mismatch: `git -C /Users/ozzy-mac/Projects/html-dash merge-base --is-ancestor feature/phase-3-renderer HEAD; echo $?` — expect `1` (Phase 3 NOT an ancestor).
-- [ ] Confirm only the spec commit is unique to this branch: `git -C /Users/ozzy-mac/Projects/html-dash log --oneline feature/phase-3-renderer..feature/phase-4a-find` — expect a single line `89a2fa5 docs(phase-4a): spec for Find (global omnibox)`.
-- [ ] Rebase the spec commit onto Phase 3: `git -C /Users/ozzy-mac/Projects/html-dash rebase --onto feature/phase-3-renderer 17bb59a feature/phase-4a-find`.
-- [ ] Verify Phase 3 is now present: `git -C /Users/ozzy-mac/Projects/html-dash merge-base --is-ancestor feature/phase-3-renderer HEAD; echo $?` — expect `0`; and `test -f /Users/ozzy-mac/Projects/html-dash/tests/test_render_dom.py && grep -c "_reduce_for_size" /Users/ozzy-mac/Projects/html-dash/src/acc/generate.py` — expect a non-zero count.
-- [ ] Install the test extra and confirm the full suite is green on the new base: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pip install -e '.[test]' && python3 -m playwright install chromium` then `python3 -m pytest -q` — expect all tests pass (Phase 3 unit + DOM).
+- [ ] Confirm the mismatch: `git -C . merge-base --is-ancestor feature/phase-3-renderer HEAD; echo $?` — expect `1` (Phase 3 NOT an ancestor).
+- [ ] Confirm only the spec commit is unique to this branch: `git -C . log --oneline feature/phase-3-renderer..feature/phase-4a-find` — expect a single line `89a2fa5 docs(phase-4a): spec for Find (global omnibox)`.
+- [ ] Rebase the spec commit onto Phase 3: `git -C . rebase --onto feature/phase-3-renderer 17bb59a feature/phase-4a-find`.
+- [ ] Verify Phase 3 is now present: `git -C . merge-base --is-ancestor feature/phase-3-renderer HEAD; echo $?` — expect `0`; and `test -f ./tests/test_render_dom.py && grep -c "_reduce_for_size" ./src/acc/generate.py` — expect a non-zero count.
+- [ ] Install the test extra and confirm the full suite is green on the new base: `cd . && python3 -m pip install -e '.[test]' && python3 -m playwright install chromium` then `python3 -m pytest -q` — expect all tests pass (Phase 3 unit + DOM).
 - [ ] No commit (rebase already rewrote history). If the rebase is undesired, the fallback is `git merge feature/phase-3-renderer` on this branch; either way Phase 3 code must be in the tree before Task 1.
 
 ---
@@ -65,7 +65,7 @@ def test_doc_type_label_unknown_bucket_titlecases():
     from acc.adapters.base import doc_type_label
     assert doc_type_label("misc") == "Misc"
 ```
-- [ ] Run it — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_adapter_base.py -q` → `ImportError: cannot import name 'doc_type_label'`.
+- [ ] Run it — expect FAIL: `cd . && python3 -m pytest tests/test_adapter_base.py -q` → `ImportError: cannot import name 'doc_type_label'`.
 - [ ] Implement. In `src/acc/adapters/base.py`, after the `empty_docs()` function (line 38), add:
 ```python
 # Human group headings for the doc buckets. Generator-controlled constants
@@ -88,8 +88,8 @@ def doc_type_label(bucket: str) -> str:
     """
     return _DOC_TYPE_LABELS.get(bucket, bucket.title())
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_adapter_base.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/adapters/base.py tests/test_adapter_base.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): doc bucket type-label lookup for search records"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_adapter_base.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/adapters/base.py tests/test_adapter_base.py && git -C . commit -m "feat(phase-4a): doc bucket type-label lookup for search records"`
 
 ---
 
@@ -123,7 +123,7 @@ def test_todo_records_have_ids(tmp_path):
     todos = data["project"]["openTodos"]
     assert todos and all(t.get("id") and len(t["id"]) == 12 for t in todos)
 ```
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generic_adapter.py::test_extract_todos_carry_stable_id tests/test_generate.py::test_todo_records_have_ids -q` → `KeyError: 'id'` / `AssertionError`.
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_generic_adapter.py::test_extract_todos_carry_stable_id tests/test_generate.py::test_todo_records_have_ids -q` → `KeyError: 'id'` / `AssertionError`.
 - [ ] Implement. In `src/acc/adapters/generic.py`, replace `_extract_todos` (lines 55-59):
 ```python
 def _extract_todos(text: str, rel: str) -> list[dict]:
@@ -141,8 +141,8 @@ def _extract_todos(text: str, rel: str) -> list[dict]:
                         "text": todo_text, "path": rel})
     return out
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generic_adapter.py tests/test_generate.py -q` → all pass (existing TODO tests still green; they read `t["text"]`).
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/adapters/generic.py tests/test_generic_adapter.py tests/test_generate.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): stable id on every open-TODO record"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_generic_adapter.py tests/test_generate.py -q` → all pass (existing TODO tests still green; they read `t["text"]`).
+- [ ] Commit: `git -C . add src/acc/adapters/generic.py tests/test_generic_adapter.py tests/test_generate.py && git -C . commit -m "feat(phase-4a): stable id on every open-TODO record"`
 
 ---
 
@@ -173,7 +173,7 @@ def test_escape_pass_caps_body_slice_multibyte_safe():
     assert len(slice_) <= _SEARCH_BODY_CHARS          # char-capped
     assert slice_ == long_body[:_SEARCH_BODY_CHARS]    # clean codepoint cut
 ```
-- [ ] Run it — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py::test_search_body_char_cap_is_200 tests/test_generate.py::test_escape_pass_caps_body_slice_multibyte_safe -q` → `ImportError: cannot import name '_SEARCH_BODY_CHARS'`.
+- [ ] Run it — expect FAIL: `cd . && python3 -m pytest tests/test_generate.py::test_search_body_char_cap_is_200 tests/test_generate.py::test_escape_pass_caps_body_slice_multibyte_safe -q` → `ImportError: cannot import name '_SEARCH_BODY_CHARS'`.
 - [ ] Implement constant. In `src/acc/generate.py`, after line 21 (`_TRUNCATE_BYTES = 2_000_000`), add:
 ```python
 # Cap on the per-item body slice appended to each search record's `text`.
@@ -225,8 +225,8 @@ with:
 ```
 
   Note: docs have no `_rawBody` and no `summary_src`, so `_searchBody` becomes the escaped `summary` — exactly the spec default (slice the doc summary). Inventory items today also lack `_rawBody`, so they fall back to the escaped summary; the `_rawBody` branch is live for any future adapter that sets it.
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/generate.py tests/test_generate.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): _SEARCH_BODY_CHARS cap + escaped body slice on escape pass"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_generate.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/generate.py tests/test_generate.py && git -C . commit -m "feat(phase-4a): _SEARCH_BODY_CHARS cap + escaped body slice on escape pass"`
 
 ---
 
@@ -285,7 +285,7 @@ def test_build_search_stays_sorted(tmp_path):
     keys = [(r["path"], r["title"], r["id"]) for r in recs]
     assert keys == sorted(keys)
 ```
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -k "build_search" -q` → `KeyError`/`AssertionError` (records lack `type`/`typeLabel`, `text` lacks the slice).
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_generate.py -k "build_search" -q` → `KeyError`/`AssertionError` (records lack `type`/`typeLabel`, `text` lacks the slice).
 - [ ] Implement import. In `src/acc/generate.py` line 11, change:
 ```python
 from .adapters.base import ScanContext, empty_inventory, empty_docs
@@ -326,7 +326,7 @@ def _search_record(it: dict, type_: str, type_label: str) -> dict:
     return {"id": it["id"], "type": type_, "typeLabel": type_label,
             "title": it["title"], "path": it["path"], "text": text}
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -q` → all pass.
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_generate.py -q` → all pass.
 - [ ] Confirm island stays free of the private `_searchBody` key (it is never written into `data` — only `inv`/`docs` carry it, and those dicts ARE in `data`). Add a guard test to `tests/test_generate.py`:
 ```python
 def test_private_search_body_key_not_in_island(tmp_path):
@@ -342,8 +342,8 @@ def test_private_search_body_key_not_in_island(tmp_path):
             for it in items:
                 it.pop("_searchBody", None)
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/generate.py tests/test_generate.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): search records carry type/typeLabel + escaped body slice"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_generate.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/generate.py tests/test_generate.py && git -C . commit -m "feat(phase-4a): search records carry type/typeLabel + escaped body slice"`
 
 ---
 
@@ -391,7 +391,7 @@ def test_over_2mb_truncates_keeps_light_search(tmp_path):
         assert {"id", "type", "typeLabel", "title", "path", "text"} <= set(r.keys())
 ```
 - [ ] Update the existing Phase 3 assertion that the spec changes. In `tests/test_generate.py`, find `test_over_2mb_truncates_to_summary_only` and change `assert data["search"] == []` to `assert data["search"] and all(r["text"] == "" for r in data["search"])` (the light index now survives).
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -k "reduce or truncat" -q` → `AssertionError` (search emptied).
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_generate.py -k "reduce or truncat" -q` → `AssertionError` (search emptied).
 - [ ] Implement. In `src/acc/generate.py`, replace `reduced["search"] = []` (line 158):
 ```python
     # Light index: keep names + paths searchable after truncation, drop the
@@ -402,8 +402,8 @@ def test_over_2mb_truncates_keeps_light_search(tmp_path):
         for r in reduced["search"]
     ]
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/generate.py tests/test_generate.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): light name/path search index on size truncation"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_generate.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/generate.py tests/test_generate.py && git -C . commit -m "feat(phase-4a): light name/path search index on size truncation"`
 
 ---
 
@@ -458,7 +458,7 @@ def test_validate_rejects_unknown_search_type():
     with pytest.raises(ValueError, match="search"):
         validate(_data_with_search(rec))
 ```
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_schema.py -k "search" -q` → the reject tests fail (no enforcement yet).
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_schema.py -k "search" -q` → the reject tests fail (no enforcement yet).
 - [ ] Implement. In `src/acc/schema.py`, after the `_REQUIRED_TOP` set (line 10), add:
 ```python
 _SEARCH_KEYS = ("id", "type", "typeLabel", "title", "path", "text")
@@ -485,8 +485,8 @@ def _validate_search(records: list) -> None:
 ```python
     _validate_search(data["search"])
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_schema.py tests/test_generate.py -q` → all pass (generate's real records satisfy the new check; light index passes via empty-string `text`).
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/schema.py tests/test_schema.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): validate enforces search-record shape and known type"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_schema.py tests/test_generate.py -q` → all pass (generate's real records satisfy the new check; light index passes via empty-string `text`).
+- [ ] Commit: `git -C . add src/acc/schema.py tests/test_schema.py && git -C . commit -m "feat(phase-4a): validate enforces search-record shape and known type"`
 
 ---
 
@@ -518,7 +518,7 @@ def test_htmlunescape_decodes_entities(page, tmp_path):
         "() => window.__accHtmlUnescape('AT&amp;T &lt;b&gt; &quot;q&quot; &#x27;s')")
     assert decoded == "AT&T <b> \"q\" 's"
 ```
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -k "dataset_id or htmlunescape" -q` → no `data-id` / `window.__accHtmlUnescape is not a function`.
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_render_dom.py -k "dataset_id or htmlunescape" -q` → no `data-id` / `window.__accHtmlUnescape is not a function`.
 - [ ] Implement `htmlUnescape`. In `src/acc/templates/app.js`, after the `el` function (line 11), add:
 ```javascript
   // Decode the five entities html.escape (Python) produces. Applied ONLY at
@@ -580,8 +580,8 @@ def test_htmlunescape_decodes_entities(page, tmp_path):
           title: it.title, path: it.path, summary: it.summary
         }));
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -q` → all pass (existing Phase 3 DOM tests still green; `AT&T`-style display now decoded).
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/templates/app.js tests/test_render_dom.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): htmlUnescape helper + per-row data-id in render paths"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_render_dom.py -q` → all pass (existing Phase 3 DOM tests still green; `AT&T`-style display now decoded).
+- [ ] Commit: `git -C . add src/acc/templates/app.js tests/test_render_dom.py && git -C . commit -m "feat(phase-4a): htmlUnescape helper + per-row data-id in render paths"`
 
 ---
 
@@ -606,7 +606,7 @@ def test_omnibox_and_filter_inputs_distinct(page, tmp_path):
     assert "filter" in (filt.get_attribute("aria-label") or "").lower()
     assert page.locator("#acc-omnibox-results").count() == 1
 ```
-- [ ] Run it — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py::test_omnibox_and_filter_inputs_distinct -q` → `#acc-omnibox` count 0.
+- [ ] Run it — expect FAIL: `cd . && python3 -m pytest tests/test_render_dom.py::test_omnibox_and_filter_inputs_distinct -q` → `#acc-omnibox` count 0.
 - [ ] Implement. In `src/acc/templates/dashboard.html.tmpl`, replace the header block (lines 11-15):
 ```html
 <header class="acc-head">
@@ -619,8 +619,8 @@ def test_omnibox_and_filter_inputs_distinct(page, tmp_path):
   <span class="acc-meta" id="acc-meta"></span>
 </header>
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py::test_omnibox_and_filter_inputs_distinct tests/test_render.py -q` → pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/templates/dashboard.html.tmpl tests/test_render_dom.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): omnibox markup + relabel per-view filter input"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_render_dom.py::test_omnibox_and_filter_inputs_distinct tests/test_render.py -q` → pass.
+- [ ] Commit: `git -C . add src/acc/templates/dashboard.html.tmpl tests/test_render_dom.py && git -C . commit -m "feat(phase-4a): omnibox markup + relabel per-view filter input"`
 
 ---
 
@@ -649,7 +649,7 @@ def test_jump_unknown_id_does_not_throw(page, tmp_path):
     # an id with no rendered row must degrade silently (no exception)
     assert page.evaluate("() => { window.__accJump('nope_no_row'); return true; }") is True
 ```
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -k "jump" -q` → `window.__accJump is not a function`.
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_render_dom.py -k "jump" -q` → `window.__accJump is not a function`.
 - [ ] Implement. In `src/acc/templates/app.js`, after `wireSearch` (before the bootstrap at line 165), add:
 ```javascript
   var rowById = new Map();
@@ -686,8 +686,8 @@ def test_jump_unknown_id_does_not_throw(page, tmp_path):
   wireSearch();
 })();
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/templates/app.js tests/test_render_dom.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): id->row map + scrollIntoView/flash jump infra"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_render_dom.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/templates/app.js tests/test_render_dom.py && git -C . commit -m "feat(phase-4a): id->row map + scrollIntoView/flash jump infra"`
 
 ---
 
@@ -836,7 +836,7 @@ def test_omnibox_light_index_note(page, tmp_path):
     assert panel.locator(".acc-omni-hit", has_text="reviewer").count() >= 1
     assert "body search is off" in panel.inner_text().lower()
 ```
-- [ ] Run them — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -k omnibox -q` → no results panel populated.
+- [ ] Run them — expect FAIL: `cd . && python3 -m pytest tests/test_render_dom.py -k omnibox -q` → no results panel populated.
 - [ ] Implement `wireOmnibox`. In `src/acc/templates/app.js`, after `jumpTo`/`window.__accJump` (Task 9) and before the bootstrap, add:
 ```javascript
   var OMNI_GROUP_CAP = 8;
@@ -994,8 +994,8 @@ def test_omnibox_light_index_note(page, tmp_path):
   wireSearch();
 })();
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/templates/app.js tests/test_render_dom.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): global omnibox over data.search (group/snippet/mark/keyboard/jump)"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_render_dom.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/templates/app.js tests/test_render_dom.py && git -C . commit -m "feat(phase-4a): global omnibox over data.search (group/snippet/mark/keyboard/jump)"`
 
 ---
 
@@ -1022,7 +1022,7 @@ def test_omnibox_panel_styled_and_flash_defined(page, tmp_path):
         "el => getComputedStyle(el).backgroundColor")
     assert bg not in ("rgba(0, 0, 0, 0)", "transparent")
 ```
-- [ ] Run it — expect FAIL: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py::test_omnibox_panel_styled_and_flash_defined -q` → position `static`.
+- [ ] Run it — expect FAIL: `cd . && python3 -m pytest tests/test_render_dom.py::test_omnibox_panel_styled_and_flash_defined -q` → position `static`.
 - [ ] Implement. Append to `src/acc/templates/styles.css`:
 ```css
 .acc-omnibox-wrap { position: relative; flex: 1 1 280px; max-width: 520px; }
@@ -1042,8 +1042,8 @@ mark { background: #ffe066; color: #1a1a1a; border-radius: 2px; padding: 0 1px; 
 @keyframes acc-flash-kf { from { background: #ffe066; } to { background: transparent; } }
 .acc-flash { animation: acc-flash-kf 1.6s ease-out; }
 ```
-- [ ] Run to pass: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_render_dom.py -q` → all pass.
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add src/acc/templates/styles.css tests/test_render_dom.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "feat(phase-4a): omnibox panel, mark highlight, and jump-flash styles"`
+- [ ] Run to pass: `cd . && python3 -m pytest tests/test_render_dom.py -q` → all pass.
+- [ ] Commit: `git -C . add src/acc/templates/styles.css tests/test_render_dom.py && git -C . commit -m "feat(phase-4a): omnibox panel, mark highlight, and jump-flash styles"`
 
 ---
 
@@ -1071,8 +1071,8 @@ def test_app_js_has_no_html_sinks():
     matches = [ln for ln in src.splitlines() if _BANNED.search(ln)]
     assert not matches, "banned HTML sink in app.js: %r" % matches
 ```
-- [ ] Run it — expect PASS now (the omnibox uses only `el()`/`textContent`/`createElement('mark')`): `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_appjs_guard.py -q` → pass. (To confirm the guard actually bites: temporarily add a line `x.innerHTML = "y";` to `app.js`, rerun → FAIL `banned HTML sink`, then revert.)
-- [ ] Commit: `git -C /Users/ozzy-mac/Projects/html-dash add tests/test_appjs_guard.py && git -C /Users/ozzy-mac/Projects/html-dash commit -m "test(phase-4a): CI guard rejecting innerHTML/outerHTML/insertAdjacentHTML in app.js"`
+- [ ] Run it — expect PASS now (the omnibox uses only `el()`/`textContent`/`createElement('mark')`): `cd . && python3 -m pytest tests/test_appjs_guard.py -q` → pass. (To confirm the guard actually bites: temporarily add a line `x.innerHTML = "y";` to `app.js`, rerun → FAIL `banned HTML sink`, then revert.)
+- [ ] Commit: `git -C . add tests/test_appjs_guard.py && git -C . commit -m "test(phase-4a): CI guard rejecting innerHTML/outerHTML/insertAdjacentHTML in app.js"`
 
 ---
 
@@ -1083,9 +1083,9 @@ Final gate: whole test suite green, ruff clean, output byte-identical across run
 **Files:**
 - Test: all of `tests/`
 
-- [ ] Run the full suite: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest -q` → all pass (unit + schema + DOM + guard).
-- [ ] Lint: `cd /Users/ozzy-mac/Projects/html-dash && ruff check src/` → no errors. (If `ruff` is not on PATH, `python3 -m ruff check src/`.)
-- [ ] Determinism spot-check: `cd /Users/ozzy-mac/Projects/html-dash && python3 -m pytest tests/test_generate.py -k deterministic -q` → pass (byte-identical output already asserted by `test_generate_is_deterministic` and `test_generate_multi_provider_is_deterministic`; the explicit `_build_search` sort keeps the new fields ordered).
+- [ ] Run the full suite: `cd . && python3 -m pytest -q` → all pass (unit + schema + DOM + guard).
+- [ ] Lint: `cd . && ruff check src/` → no errors. (If `ruff` is not on PATH, `python3 -m ruff check src/`.)
+- [ ] Determinism spot-check: `cd . && python3 -m pytest tests/test_generate.py -k deterministic -q` → pass (byte-identical output already asserted by `test_generate_is_deterministic` and `test_generate_multi_provider_is_deterministic`; the explicit `_build_search` sort keeps the new fields ordered).
 - [ ] No commit (gate only). If any step fails, fix in the owning task and re-run.
 
 ---

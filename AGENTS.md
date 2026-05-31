@@ -5,6 +5,9 @@ Codex, Cursor) and generates a deterministic, single-file, offline HTML dashboar
 the repo declares — agents, skills, hooks, commands, MCP servers, rules, docs, and open
 TODOs. Public repo: `omerakben/ai-control-center`.
 
+> The generated control center for this repo is [`.claude/dashboard.html`](.claude/dashboard.html).
+> Open it in a browser; run `/dashboard` (or `acc --root .`) to refresh it.
+
 ## What this is
 
 - A generator (`src/acc/`) reads the repo, normalizes each provider through an adapter,
