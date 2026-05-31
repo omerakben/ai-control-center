@@ -2,6 +2,7 @@
   var node = document.getElementById("acc-data");
   var data = JSON.parse(node.textContent);
   var pathPrefix = (data.source && data.source.pathPrefix) || "";
+  var truncated = !!(data.generator && data.generator.truncated);
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -35,15 +36,184 @@
     }).join("/");
   }
 
+  // ---- markdown → DOM (textContent-only; NO HTML-string sinks) ----
+  // Every node is built via createElement + createTextNode, so hostile markup in
+  // author content stays inert and the CI guard (which forbids the HTML-string
+  // assignment properties) holds. Search highlight is folded in so markdown
+  // spans and <mark> compose in one pass.
+
+  // Mirror markdown.py:_safe_link — allow only http/https or repo-relative; a
+  // leading "/" (root- or protocol-relative) and any non-http(s) scheme (e.g.
+  // javascript:) are rejected so a link can never become a script sink.
+  function safeUrl(url) {
+    var m = /^([a-z][a-z0-9+.\-]*):/i.exec(url);
+    if (m) return /^https?$/i.test(m[1]);
+    return url.charAt(0) !== "/";
+  }
+
+  // Append `logical` text into `target`, wrapping query matches in <mark>.
+  function appendHighlighted(target, logical, qLower) {
+    if (!qLower) { target.appendChild(document.createTextNode(logical)); return; }
+    var hay = logical.toLowerCase(), from = 0, idx;
+    while ((idx = hay.indexOf(qLower, from)) !== -1) {
+      if (idx > from) target.appendChild(document.createTextNode(logical.slice(from, idx)));
+      var mk = el("mark");
+      mk.textContent = logical.slice(idx, idx + qLower.length);
+      target.appendChild(mk);
+      from = idx + qLower.length;
+    }
+    if (from < logical.length) target.appendChild(document.createTextNode(logical.slice(from)));
+  }
+
+  // Inner emphasis classes use [^*]/[^`] so a single scanner pass can't run away
+  // on pathological input, and so snake_case (handled by asterisks-only) and
+  // code never get mangled. Asterisks only — underscores are left literal so
+  // identifiers like rate_limit_config render verbatim.
+  var RE_CODE = /`([^`]+)`/;
+  var RE_LINK = /\[([^\]]+)\]\(([^)\s]+)\)/;
+  var RE_BOLD = /\*\*([^*]+?)\*\*/;
+  var RE_ITALIC = /\*([^*]+?)\*/;
+
+  // Render inline markdown of LOGICAL (already-unescaped) text into `parent`.
+  function renderInlineInto(parent, text, qLower) {
+    if (!text) return;
+    var best = null;
+    function consider(re, type) {
+      var m = re.exec(text);
+      if (m && (best === null || m.index < best.i)) best = { i: m.index, m: m, type: type };
+    }
+    consider(RE_CODE, "code");
+    consider(RE_LINK, "link");
+    consider(RE_BOLD, "bold");
+    consider(RE_ITALIC, "italic");
+    if (best === null) { appendHighlighted(parent, text, qLower); return; }
+    if (best.i > 0) appendHighlighted(parent, text.slice(0, best.i), qLower);
+    var m = best.m, rest = text.slice(best.i + m[0].length);
+    if (best.type === "code") {
+      var c = el("code");
+      appendHighlighted(c, m[1], qLower);
+      parent.appendChild(c);
+    } else if (best.type === "link") {
+      if (safeUrl(m[2])) {
+        var a = el("a", "acc-mdlink");
+        a.href = m[2];
+        renderInlineInto(a, m[1], qLower);
+        parent.appendChild(a);
+      } else {
+        // unsafe scheme: degrade to plain "label (url)" like markdown.py does
+        renderInlineInto(parent, m[1] + " (" + m[2] + ")", qLower);
+      }
+    } else {
+      var e = el(best.type === "bold" ? "strong" : "em");
+      renderInlineInto(e, m[1], qLower);
+      parent.appendChild(e);
+    }
+    renderInlineInto(parent, rest, qLower);
+  }
+
+  // Convenience: render an ESCAPED island string (unescape first, then tokenize).
+  function mdInline(parent, escaped, qLower) {
+    renderInlineInto(parent, htmlUnescape(escaped), qLower || "");
+  }
+  // expose the inline renderer for DOM tests
+  window.__accRenderInline = function (parent, escaped, q) { mdInline(parent, escaped, q); };
+
+  // Render block-level markdown (headings, lists, fenced code, paragraphs) of an
+  // ESCAPED island string into `container`. Used for the inline reading pane.
+  function renderBlocks(container, escaped, qLower) {
+    var lines = htmlUnescape(escaped).split("\n");
+    var i = 0, list = null;
+    function flush() { if (list) { container.appendChild(list); list = null; } }
+    while (i < lines.length) {
+      var line = lines[i];
+      if (/^\s*```/.test(line)) {
+        flush();
+        var buf = [];
+        i++;
+        while (i < lines.length && !/^\s*```/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++; // skip closing fence
+        var pre = el("pre"), code = el("code");
+        code.textContent = buf.join("\n");
+        pre.appendChild(code);
+        container.appendChild(pre);
+        continue;
+      }
+      var h = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (h) {
+        flush();
+        var hh = el("h" + h[1].length);
+        renderInlineInto(hh, h[2], qLower || "");
+        container.appendChild(hh);
+        i++;
+        continue;
+      }
+      var li = /^\s*[-*+]\s+(.*)$/.exec(line);
+      if (li) {
+        if (!list) list = el("ul");
+        var item = el("li");
+        renderInlineInto(item, li[1], qLower || "");
+        list.appendChild(item);
+        i++;
+        continue;
+      }
+      if (line.trim() === "") { flush(); i++; continue; }
+      flush();
+      var p = el("p");
+      renderInlineInto(p, line, qLower || "");
+      container.appendChild(p);
+      i++;
+    }
+    flush();
+  }
+
+  // ---- rows ----
   function itemRow(opts) {
     var row = el("div", "acc-row acc-item");
     if (opts.id) row.dataset.id = opts.id;
     var head = el("div", "acc-rowhead");
-    if (opts.provider) head.appendChild(el("span", "acc-chip", opts.provider));
+    if (opts.provider) head.appendChild(el("span", "acc-chip acc-prov", opts.provider));
     if (opts.typeLabel) head.appendChild(el("span", "badge", opts.typeLabel));
-    head.appendChild(el("span", "acc-itemtitle", htmlUnescape(opts.title)));
+    var titleEl = el("span", "acc-itemtitle");
+    mdInline(titleEl, opts.title, "");
+    head.appendChild(titleEl);
+
+    var detail = null;
+    if (opts.body) {
+      var opened = false, built = false;
+      var toggle = el("button", "acc-toggle");
+      toggle.type = "button";
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-label", "Toggle reading view");
+      toggle.appendChild(el("span", "acc-caret", "›"));
+      toggle.appendChild(el("span", "acc-toggle-label", "Read"));
+      detail = el("div", "acc-detail acc-hidden");
+      var openDetail = function () {
+        if (!built) { renderBlocks(detail, opts.body, ""); built = true; }
+        detail.classList.remove("acc-hidden");
+        row.classList.add("acc-open");
+        toggle.setAttribute("aria-expanded", "true");
+        opened = true;
+      };
+      var closeDetail = function () {
+        detail.classList.add("acc-hidden");
+        row.classList.remove("acc-open");
+        toggle.setAttribute("aria-expanded", "false");
+        opened = false;
+      };
+      toggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        opened ? closeDetail() : openDetail();
+      });
+      head.appendChild(toggle);
+      row.__accExpand = openDetail;  // for jump-to-expand from the omnibox
+    }
+
     row.appendChild(head);
-    if (opts.summary) row.appendChild(el("div", "acc-summary", htmlUnescape(opts.summary)));
+    if (opts.summary) {
+      var s = el("div", "acc-summary");
+      mdInline(s, opts.summary, "");
+      row.appendChild(s);
+    }
     if (pathPrefix) {
       var a = el("a", "path", opts.path);
       a.href = encodedRelHref(pathPrefix, opts.path);
@@ -51,10 +221,29 @@
     } else {
       row.appendChild(el("span", "path", opts.path));
     }
+    if (detail) row.appendChild(detail);
     row.dataset.search =
-      (htmlUnescape(opts.title) + " " + opts.path + " " +
+      (htmlUnescape(opts.title) + " " + (opts.path || "") + " " +
        htmlUnescape(opts.summary || "")).toLowerCase();
     return row;
+  }
+
+  function emptyNote(kind) {
+    var msg;
+    if (kind === "inventory") {
+      msg = truncated
+        ? "Inventory was trimmed from this summary view — regenerate on a smaller scope to read the agents, skills, commands, hooks and MCP servers."
+        : "No agents, skills, commands, hooks, or MCP servers are configured in this repo.";
+    } else if (kind === "docs") {
+      msg = truncated
+        ? "Referenced docs were trimmed from this summary view."
+        : "No referenced docs (CLAUDE.md, AGENTS.md, ADRs, specs…) found in this repo.";
+    } else {
+      msg = truncated
+        ? "Open TODOs were trimmed from this summary view."
+        : "No open TODOs (‑ [ ] checkboxes) found in this repo.";
+    }
+    return el("div", "acc-empty", msg);
   }
 
   // Display order (deliberate; differs from _INV_BUCKETS storage order in
@@ -68,52 +257,128 @@
   function renderInventory() {
     var host = document.getElementById("acc-inventory");
     var inv = data.inventory || {};
+    var any = false;
     INV_ORDER.forEach(function (bucket) {
       var items = inv[bucket] || [];
       if (!items.length) return;
-      host.appendChild(el("div", "acc-sublabel",
-        INV_LABEL[bucket] + " (" + items.length + ")"));
+      any = true;
+      var head = el("div", "acc-sublabel", INV_LABEL[bucket] + " (" + items.length + ")");
+      head.id = "inv-" + bucket;
+      host.appendChild(head);
       items.forEach(function (it) {
         host.appendChild(itemRow({
           id: it.id,
           provider: it.provider, typeLabel: it.typeLabel,
-          title: it.title, path: it.path, summary: it.summary
+          title: it.title, path: it.path, summary: it.summary, body: it.body
         }));
       });
     });
+    if (!any) host.appendChild(emptyNote("inventory"));
   }
 
-  function renderHead() {
-    document.getElementById("acc-title").textContent = data.project.title;
-    var m = data.source;
-    document.getElementById("acc-meta").textContent =
-      "stamped · digest " + m.sourceDigest + " · vcs: " + m.vcs.kind + " · freshness is manual";
+  function topDir(path) {
+    var i = path.indexOf("/");
+    return i === -1 ? "(root)" : path.slice(0, i) + "/";
   }
 
   function renderDocs() {
     var host = document.getElementById("acc-docs");
-    var groups = data.docs;
-    Object.keys(groups).sort().forEach(function (g) {
-      groups[g].forEach(function (doc) {
-        host.appendChild(itemRow({
-          id: doc.id,
-          typeLabel: g, title: doc.title, path: doc.path, summary: doc.summary
+    var groups = data.docs || {};
+    var all = [];
+    Object.keys(groups).forEach(function (g) {
+      (groups[g] || []).forEach(function (d) { all.push(d); });
+    });
+    if (!all.length) { host.appendChild(emptyNote("docs")); return; }
+
+    var byDir = {};
+    all.forEach(function (d) {
+      var k = topDir(d.path);
+      (byDir[k] || (byDir[k] = [])).push(d);
+    });
+    var dirs = Object.keys(byDir).sort();
+    var collapse = all.length > 40;  // big repos: groups collapsed by default
+
+    dirs.forEach(function (dir) {
+      var items = byDir[dir].sort(function (a, b) {
+        return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+      });
+      var wrap = el("div", "acc-group");
+      items.forEach(function (doc) {
+        wrap.appendChild(itemRow({
+          id: doc.id, title: doc.title, path: doc.path,
+          summary: doc.summary, body: doc.body
         }));
       });
+      if (collapse) {
+        wrap.classList.add("acc-hidden");
+        var btn = el("button", "acc-sublabel acc-grouptoggle");
+        btn.type = "button";
+        btn.setAttribute("aria-expanded", "false");
+        btn.appendChild(el("span", "acc-caret", "›"));
+        btn.appendChild(el("span", null, dir + " (" + items.length + ")"));
+        btn.addEventListener("click", function () {
+          var open = wrap.classList.toggle("acc-hidden");
+          btn.setAttribute("aria-expanded", String(!open));
+          btn.classList.toggle("acc-open", !open);
+        });
+        host.appendChild(btn);
+      } else {
+        host.appendChild(el("div", "acc-sublabel", dir + " (" + items.length + ")"));
+      }
+      host.appendChild(wrap);
     });
   }
 
+  var TODO_CAP = 50;
+
   function renderTodos() {
     var host = document.getElementById("acc-todos");
-    (data.project.openTodos || []).forEach(function (t) {
-      host.appendChild(itemRow({ id: t.id, title: t.text, path: t.path }));
+    var todos = (data.project && data.project.openTodos) || [];
+    if (!todos.length) { host.appendChild(emptyNote("todos")); return; }
+    var box = el("div", "acc-todos");
+    todos.slice(0, TODO_CAP).forEach(function (t) {
+      box.appendChild(itemRow({ id: t.id, title: t.text, path: t.path }));
     });
+    host.appendChild(box);
+    if (todos.length > TODO_CAP) {
+      host.appendChild(el("div", "acc-more",
+        "Showing " + TODO_CAP + " of " + todos.length +
+        " — press / and search to jump to a specific TODO."));
+    }
+  }
+
+  function renderHead() {
+    document.getElementById("acc-title").textContent = data.project.title;
+    var s = data.source;
+
+    var orient = document.getElementById("acc-orient");
+    if (orient) {
+      orient.textContent = "Offline map of " + htmlUnescape(s.repoName) +
+        "'s AI layer — every card links to its source file. Press / to search.";
+    }
+
+    var meta = document.getElementById("acc-meta");
+    meta.textContent = "";
+    var manual = !s.vcs || s.vcs.kind === "none";
+    var dot = el("span", "acc-dot " + (manual ? "acc-dot-manual" : "acc-dot-fresh"));
+    dot.title = manual ? "freshness is manual — re-run the dashboard to refresh" : "tracked";
+    meta.appendChild(dot);
+    meta.appendChild(el("span", "acc-pill", "digest " + s.sourceDigest));
+    meta.appendChild(el("span", "acc-pill", "schema v" + data.schemaVersion));
+    meta.appendChild(el("span", "acc-pill acc-pill-good", "redaction on"));
+
+    var trust = document.getElementById("acc-trust");
+    if (trust) {
+      var line = "Redaction runs at extraction and a tripwire re-scans the output; secrets never reach this file. " +
+        "Freshness is manual — this is a snapshot at digest " + s.sourceDigest + ".";
+      trust.appendChild(el("span", "acc-trust-text", line));
+    }
   }
 
   function plural(n, word) { return n + " " + (n === 1 ? word.replace(/s$/, "") : word); }
 
-  function card(title, target) {
-    var c = el("div", "acc-card");
+  function card(title, target, cls) {
+    var c = el("div", "acc-card" + (cls ? " " + cls : ""));
     if (target) {
       var a = el("a", "acc-card-h", title);
       a.href = "#" + target;
@@ -133,7 +398,7 @@
     var firstClass = provs.filter(function (p) { return p.id !== "generic"; });
     var show = firstClass.length ? firstClass : provs;
     if (show.length) {
-      var pc = card("Providers");
+      var pc = card("Providers", null, "acc-card-providers");
       show.forEach(function (p) { pc.appendChild(el("span", "acc-chip", p.displayName)); });
       bento.appendChild(pc);
     }
@@ -141,17 +406,34 @@
     var inv = data.inventory || {};
     var nonEmpty = INV_ORDER.filter(function (b) { return (inv[b] || []).length; });
     if (nonEmpty.length) {
-      var ic = card("Inventory", "inventory");
+      var ic = card("Inventory", "inventory", "acc-card-inventory");
+      var kpis = el("div", "acc-kpis");
       nonEmpty.forEach(function (b) {
-        ic.appendChild(el("div", null, plural(inv[b].length, INV_LABEL[b].toLowerCase())));
+        var k = el("div", "acc-kpi");
+        k.appendChild(el("span", "acc-kpi-n", String(inv[b].length)));
+        k.appendChild(el("span", "acc-kpi-l", INV_LABEL[b].toLowerCase()));
+        kpis.appendChild(k);
       });
+      ic.appendChild(kpis);
       bento.appendChild(ic);
     }
 
     var todos = (data.project && data.project.openTodos) || [];
     if (todos.length) {
-      var tc = card("Open TODOs (" + todos.length + ")", "todos");
-      todos.slice(0, 3).forEach(function (t) { tc.appendChild(el("div", null, t.text)); });
+      var tc = card("Open TODOs (" + todos.length + ")", "todos", "acc-card-todos");
+      todos.slice(0, 3).forEach(function (t) {
+        var line = el("div", "acc-card-line");
+        mdInline(line, t.text, "");
+        tc.appendChild(line);
+      });
+      // action handoff — a data-true, non-asserting next move
+      var act = el("button", "acc-action");
+      act.type = "button";
+      act.textContent = todos.length === 1
+        ? "Jump to the open TODO →"
+        : "Start with the first of " + todos.length + " open TODOs →";
+      act.addEventListener("click", function () { jumpTo(todos[0].id); });
+      tc.appendChild(act);
       bento.appendChild(tc);
     }
 
@@ -159,15 +441,15 @@
     var docCount = 0;
     Object.keys(docs).forEach(function (k) { docCount += (docs[k] || []).length; });
     if (docCount) {
-      var dc = card("Docs", "docs");
-      dc.appendChild(el("div", null, docCount + " referenced"));
+      var dc = card("Docs", "docs", "acc-card-docs");
+      dc.appendChild(el("div", "acc-card-line", docCount + " referenced"));
       bento.appendChild(dc);
     }
 
     var rels = data.relationships || [];
     if (rels.length) {
-      var xc = card("Cross-references", "crossref");
-      xc.appendChild(el("div", null, plural(rels.length, "edges")));
+      var xc = card("Cross-references", "crossref", "acc-card-xref");
+      xc.appendChild(el("div", "acc-card-line", plural(rels.length, "edges")));
       bento.appendChild(xc);
     }
 
@@ -175,9 +457,17 @@
   }
 
   function renderBanner() {
-    if (!(data.generator && data.generator.truncated)) return;
-    document.getElementById("acc-banner").appendChild(el("div", "acc-noticetext",
-      "This dashboard was reduced to a summary because the full output exceeded the size budget."));
+    if (!truncated) return;
+    var steps = (data.generator && data.generator.reducedSteps) || [];
+    var dropped = [];
+    if (steps.indexOf("bodies") !== -1) dropped.push("full doc/skill bodies");
+    if (steps.indexOf("search-body") !== -1) dropped.push("body search");
+    if (steps.indexOf("summaries-blanked") !== -1) dropped.push("summaries");
+    var what = dropped.length ? dropped.join(" and ") : "some content";
+    var msg = "Summary view — " + what + " " + (dropped.length === 1 ? "was" : "were") +
+      " omitted to keep this file under the size budget. Open any item via its path link, " +
+      "or re-run the dashboard on a subfolder for full bodies.";
+    document.getElementById("acc-banner").appendChild(el("div", "acc-noticetext", msg));
   }
 
   function wireSearch() {
@@ -201,9 +491,13 @@
     });
   }
 
-  function jumpTo(id) {
+  function jumpTo(id, expand) {
     var row = rowById.get(id);
     if (!row) return; // degrade: empty bucket skipped, or light/truncated mode
+    // reveal a collapsed doc group so the row is actually visible
+    var grp = row.closest && row.closest(".acc-group.acc-hidden");
+    if (grp) grp.classList.remove("acc-hidden");
+    if (expand && typeof row.__accExpand === "function") row.__accExpand();
     row.scrollIntoView({ block: "center" });
     row.classList.remove("acc-flash");
     // reflow so re-adding the class restarts the flash animation
@@ -261,7 +555,9 @@
     btn.type = "button";
     btn.appendChild(el("span", "acc-rel-verb", verb));
     btn.appendChild(el("span", "acc-chip", meta.typeLabel));
-    btn.appendChild(el("span", "acc-rel-title", htmlUnescape(meta.title)));
+    var t = el("span", "acc-rel-title");
+    mdInline(t, meta.title, "");
+    btn.appendChild(t);
     btn.addEventListener("click", function () { jumpTo(edge.otherId); });
     return btn;
   }
@@ -272,10 +568,15 @@
       if (!edges || !edges.length) return;
       var box = el("div", "acc-related");
       edges.forEach(function (e) {
-        var node = relatedEntry(e);
-        if (node) box.appendChild(node);
+        var n = relatedEntry(e);
+        if (n) box.appendChild(n);
       });
-      if (box.children.length) row.appendChild(box);
+      if (box.children.length) {
+        // place related links above the reading pane, if any
+        var detail = row.querySelector(".acc-detail");
+        if (detail) row.insertBefore(box, detail);
+        else row.appendChild(box);
+      }
     });
   }
 
@@ -339,22 +640,6 @@
   function isLightIndex() {
     var recs = searchRecords();
     return recs.length > 0 && recs.every(function (r) { return (r.text || "") === ""; });
-  }
-
-  // Append text + <mark> nodes by splitting the logical string on the query.
-  // No HTML strings — every node is built via textContent / createElement.
-  function appendHighlighted(target, logical, qLower) {
-    if (!qLower) { target.appendChild(document.createTextNode(logical)); return; }
-    var hay = logical.toLowerCase();
-    var from = 0, idx;
-    while ((idx = hay.indexOf(qLower, from)) !== -1) {
-      if (idx > from) target.appendChild(document.createTextNode(logical.slice(from, idx)));
-      var m = document.createElement("mark");
-      m.textContent = logical.slice(idx, idx + qLower.length);
-      target.appendChild(m);
-      from = idx + qLower.length;
-    }
-    if (from < logical.length) target.appendChild(document.createTextNode(logical.slice(from)));
   }
 
   function snippetFor(rec, qLower) {
@@ -423,16 +708,16 @@
           var hit = el("div", "acc-omni-hit");
           hit.dataset.id = rec.id;
           var titleEl = el("span", "acc-omni-title");
-          appendHighlighted(titleEl, htmlUnescape(rec.title || ""), qLower);
+          mdInline(titleEl, rec.title || "", qLower);
           hit.appendChild(titleEl);
           hit.appendChild(el("span", "acc-chip", rec.typeLabel || t));
           hit.appendChild(el("span", "path", rec.path || ""));
           if ((rec.text || "") !== "") {
             var snipEl = el("span", "acc-omni-snippet");
-            appendHighlighted(snipEl, snippetFor(rec, qLower), qLower);
+            renderInlineInto(snipEl, snippetFor(rec, qLower), qLower);
             hit.appendChild(snipEl);
           }
-          hit.addEventListener("click", function () { jumpTo(rec.id); });
+          hit.addEventListener("click", function () { jumpTo(rec.id, true); });
           group.appendChild(hit);
           hits.push(rec);
         });
@@ -455,7 +740,7 @@
       else if (e.key === "Enter") {
         e.preventDefault();
         var pick = active >= 0 ? active : 0;
-        if (hits[pick]) jumpTo(hits[pick].id);
+        if (hits[pick]) jumpTo(hits[pick].id, true);
       }
     });
     document.addEventListener("keydown", function (e) {
@@ -466,6 +751,30 @@
       e.preventDefault();
       box.focus();
     });
+  }
+
+  // Scroll-spy: highlight the nav pill of the section currently in view.
+  function wireScrollSpy() {
+    var pills = {};
+    document.querySelectorAll("nav.acc-nav a[data-spy]").forEach(function (a) {
+      pills[a.getAttribute("data-spy")] = a;
+    });
+    var sections = Object.keys(pills)
+      .map(function (id) { return document.getElementById(id); })
+      .filter(Boolean);
+    if (!("IntersectionObserver" in window) || !sections.length) return;
+    var visible = {};
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { visible[en.target.id] = en.isIntersecting; });
+      var current = sections.filter(function (s) { return visible[s.id]; })[0];
+      Object.keys(pills).forEach(function (id) {
+        var on = current && id === current.id;
+        pills[id].classList.toggle("acc-nav-active", !!on);
+        if (on) pills[id].setAttribute("aria-current", "location");
+        else pills[id].removeAttribute("aria-current");
+      });
+    }, { rootMargin: "-96px 0px -65% 0px", threshold: 0 });
+    sections.forEach(function (s) { obs.observe(s); });
   }
 
   buildMeta();
@@ -481,4 +790,5 @@
   renderCrossReferences();
   wireOmnibox();
   wireSearch();
+  wireScrollSpy();
 })();

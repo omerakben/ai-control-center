@@ -1,9 +1,8 @@
 from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs
 from ..ids import rel_posix
 from ..redaction import redact_text
-from ..markdown import render_markdown_safe
 from ..config import load_toml, safe_mcp, mcp_summary, as_dict
-from .generic import _first_heading, _first_paragraph
+from .generic import _first_heading, _first_paragraph, _strip_front_matter
 
 _CONFIG_FACTS = ("model", "model_reasoning_effort", "sandbox", "approval_policy")
 
@@ -42,9 +41,10 @@ class CodexAdapter:
                     continue
                 clean, _ = redact_text(raw)
                 # prompts are invoked by filename, so the stem is the title
-                inv["commands"].append(make_item(
-                    "codex", "command", "Codex prompt", p.stem, rel,
-                    _first_paragraph(clean)))
+                item = make_item("codex", "command", "Codex prompt", p.stem, rel,
+                                 _first_paragraph(clean))
+                item["_rawBody"] = _strip_front_matter(clean)
+                inv["commands"].append(item)
             elif rel == "AGENTS.md" or (rel.startswith(".codex/") and rel.endswith("/AGENTS.md")):
                 try:
                     raw = p.read_text(encoding="utf-8", errors="replace")
@@ -57,7 +57,6 @@ class CodexAdapter:
                     "title": heading,
                     "path": rel,
                     "summary": _first_paragraph(clean),
-                    "html": render_markdown_safe(clean),
                     "_refScanBody": clean,
                 })
 

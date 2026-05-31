@@ -3,10 +3,9 @@ from pathlib import Path
 from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs
 from ..ids import rel_posix
 from ..redaction import redact_text
-from ..markdown import render_markdown_safe
 from ..frontmatter import parse_frontmatter
 from ..config import load_json, safe_mcp, mcp_summary, as_dict
-from .generic import _first_heading, _first_paragraph
+from .generic import _first_heading, _first_paragraph, _strip_front_matter
 
 
 def _title(fields: dict, fallback: str) -> str:
@@ -66,19 +65,22 @@ class ClaudeAdapter:
 
             if kind == "agent":
                 fields, _ = parse_frontmatter(raw)
-                inv["agents"].append(make_item(
-                    "claude", "agent", "Claude agent",
-                    _title(fields, stem), rel, _desc(fields)))
+                item = make_item("claude", "agent", "Claude agent",
+                                 _title(fields, stem), rel, _desc(fields))
+                item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                inv["agents"].append(item)
             elif kind == "command":
                 fields, _ = parse_frontmatter(raw)
-                inv["commands"].append(make_item(
-                    "claude", "command", "Claude command",
-                    _title(fields, stem), rel, _desc(fields)))
+                item = make_item("claude", "command", "Claude command",
+                                 _title(fields, stem), rel, _desc(fields))
+                item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                inv["commands"].append(item)
             elif kind == "skill":
                 fields, _ = parse_frontmatter(raw)
                 name = _title(fields, Path(rel).parent.name)
-                inv["skills"].append(make_item(
-                    "claude", "skill", "Claude skill", name, rel, _desc(fields)))
+                item = make_item("claude", "skill", "Claude skill", name, rel, _desc(fields))
+                item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                inv["skills"].append(item)
             else:  # "doc" — CLAUDE.md at root or nested under .claude/
                 clean, _ = redact_text(raw)
                 heading = _first_heading(clean) or rel
@@ -87,7 +89,6 @@ class ClaudeAdapter:
                     "title": heading,
                     "path": rel,
                     "summary": _first_paragraph(clean),
-                    "html": render_markdown_safe(clean),
                     "_refScanBody": clean,
                 })
 

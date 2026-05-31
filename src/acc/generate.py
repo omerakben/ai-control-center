@@ -32,6 +32,14 @@ _MAX_DEGRADED_REFERENCE_EDGES = 200
 # above the budget, so it is the real safety valve. str slicing is codepoint-
 # based, so a char cap cuts cleanly on multibyte boundaries.
 _SEARCH_BODY_CHARS = 200
+# Cap on the per-item readable `body` slice (the inline reading pane). Larger
+# than the search slice because this IS the content a reader expands, but still
+# bounded: at ~535 docs a 4 KB cap is ~2 MB pre-escape, so the body is the FIRST
+# thing _reduce_for_size sheds on a large repo (it is what blows the budget).
+# Codepoint-based slice cuts cleanly on multibyte boundaries.
+_BODY_CHARS = 4000
+# Graduated-truncation summary cap (step 2): shorten rather than blank.
+_TRUNCATED_SUMMARY_CHARS = 280
 
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
@@ -258,13 +266,16 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                 # adapter carries one, else the (now-escaped) summary. char-cap the
                 # RAW source before escaping so the visible length, not the
                 # entity-expanded one, is what _SEARCH_BODY_CHARS bounds.
-                # `_rawBody` is the documented private override: an adapter may set
-                # it on an item to make the search slice come from full body text
-                # instead of the summary. No adapter sets it today (items fall back
-                # to the escaped summary); the branch is live plumbing for Phase 4b+.
-                raw = it.get("_rawBody")
+                # `_rawBody` (inventory items: agent/skill/command/rule body) and
+                # `_refScanBody` (docs: full clean markdown) are the two readable-
+                # body sources, both already redacted at extraction. They feed BOTH
+                # the search slice and the inline reading pane's `body` field, each
+                # capped-then-escaped on this pass so the island stays uniform and
+                # the reader gets redacted-then-escaped content (no render sink).
+                raw = it.get("_rawBody") or it.get("_refScanBody")
                 if isinstance(raw, str) and raw:
                     it["_searchBody"] = _redact_escape(raw[:_SEARCH_BODY_CHARS])
+                    it["body"] = _redact_escape(raw[:_BODY_CHARS])
                 else:
                     # no raw body: reuse the already-redacted+escaped summary slice
                     it["_searchBody"] = it.get("summary", "")
@@ -318,40 +329,101 @@ def _path_prefix(root: Path, out_dir: Path) -> str:
         return ""
 
 
-def _reduce_for_size(data: dict) -> dict:
-    """Summary-only island: deep-copy then blank known heavy values.
+def _strip_bodies(data: dict) -> None:
+    """Drop the per-item reading body — the multi-MB cost on a large repo."""
+    for bucket in (data["inventory"], data["docs"]):
+        for items in bucket.values():
+            for it in items:
+                if "body" in it:
+                    it["body"] = ""
+                if "html" in it:  # legacy guard: html is no longer emitted
+                    it["html"] = ""
 
-    Blanks every inventory/doc summary, every doc html body, and the search
-    array, and sets generator.truncated. Deep-copy-then-blank preserves every
-    key and optional field (item id, MCP config, doc id), so validate() and
-    assert_no_secrets still pass on the result.
-    """
-    reduced = copy.deepcopy(data)
-    for bucket in reduced["inventory"].values():
-        for item in bucket:
-            item["summary"] = ""
-    for bucket in reduced["docs"].values():
-        for doc in bucket:
-            doc["summary"] = ""
-            if "html" in doc:
-                doc["html"] = ""
-    # Light index: keep names + paths searchable after truncation, drop the
-    # body slice. The omnibox still finds items by name/path in degraded mode.
-    reduced["search"] = [
+
+def _cap_summaries(data: dict, n: int) -> None:
+    """Shorten (not blank) summaries to n codepoints, preserving the lead."""
+    for bucket in (data["inventory"], data["docs"]):
+        for items in bucket.values():
+            for it in items:
+                s = it.get("summary", "")
+                if isinstance(s, str) and len(s) > n:
+                    it["summary"] = s[:n]
+
+
+def _blank_summaries(data: dict) -> None:
+    for bucket in (data["inventory"], data["docs"]):
+        for items in bucket.values():
+            for it in items:
+                if "summary" in it:
+                    it["summary"] = ""
+
+
+def _strip_search_body(data: dict) -> None:
+    """Keep names + paths searchable; drop the per-record body slice."""
+    data["search"] = [
         {"id": r["id"], "type": r["type"], "typeLabel": r["typeLabel"],
          "title": r["title"], "path": r["path"], "text": ""}
-        for r in reduced["search"]
+        for r in data["search"]
     ]
-    if "relationships" in reduced:
-        declares = [e for e in reduced["relationships"] if e["type"] == "declares"]
-        refs = [e for e in reduced["relationships"] if e["type"] == "reference"]
-        if len(refs) > _MAX_DEGRADED_REFERENCE_EDGES:
-            logger.warning("degraded mode: capping %d reference edges to %d",
-                           len(refs), _MAX_DEGRADED_REFERENCE_EDGES)
-            refs = refs[:_MAX_DEGRADED_REFERENCE_EDGES]
-        reduced["relationships"] = sorted(
-            declares + refs, key=lambda e: (e["from"], e["to"], e["type"]))
+
+
+def _cap_reference_edges(data: dict) -> None:
+    """Cap unbounded `reference` edges; `declares` is bounded so it is kept."""
+    if "relationships" not in data:
+        return
+    declares = [e for e in data["relationships"] if e["type"] == "declares"]
+    refs = [e for e in data["relationships"] if e["type"] == "reference"]
+    if len(refs) > _MAX_DEGRADED_REFERENCE_EDGES:
+        logger.warning("degraded mode: capping %d reference edges to %d",
+                       len(refs), _MAX_DEGRADED_REFERENCE_EDGES)
+        refs = refs[:_MAX_DEGRADED_REFERENCE_EDGES]
+    data["relationships"] = sorted(
+        declares + refs, key=lambda e: (e["from"], e["to"], e["type"]))
+
+
+def _reduce_for_size(data: dict, measure) -> dict:
+    """Graduated, biggest-cost-first trim; stop as soon as it is under budget.
+
+    Deep-copy, then shed cost in a fixed deterministic order, re-measuring
+    between steps so a repo that only slightly overflows keeps as much as it can
+    (summaries, body search) instead of being blanked wholesale. `measure(d)`
+    returns the rendered byte size of a candidate. Deep-copy-then-mutate
+    preserves every key, so validate() and assert_no_secrets still pass.
+
+    `generator.reducedSteps` records which steps fired so the banner can name
+    exactly what was dropped. Reference edges are always capped in degraded mode
+    (cheap, deterministic, independent of the byte budget).
+    """
+    reduced = copy.deepcopy(data)
     reduced["generator"]["truncated"] = True
+    steps: list[str] = []
+    _cap_reference_edges(reduced)
+
+    def under_budget() -> bool:
+        return measure(reduced) <= _TRUNCATE_BYTES
+
+    # Step 1: drop the per-item reading body (the dominant cost).
+    _strip_bodies(reduced)
+    steps.append("bodies")
+    if under_budget():
+        reduced["generator"]["reducedSteps"] = steps
+        return reduced
+    # Step 2: cap (not blank) summaries.
+    _cap_summaries(reduced, _TRUNCATED_SUMMARY_CHARS)
+    steps.append("summaries-capped")
+    if under_budget():
+        reduced["generator"]["reducedSteps"] = steps
+        return reduced
+    # Step 3: drop the search body slice (names + paths stay searchable).
+    _strip_search_body(reduced)
+    steps.append("search-body")
+    if under_budget():
+        reduced["generator"]["reducedSteps"] = steps
+        return reduced
+    # Step 4 (last resort): blank summaries entirely.
+    _blank_summaries(reduced)
+    steps.append("summaries-blanked")
+    reduced["generator"]["reducedSteps"] = steps
     return reduced
 
 
@@ -416,6 +488,7 @@ def generate_result(root: Path, out_dir: Path | None = None,
             for it in items:
                 it.pop("_searchBody", None)
                 it.pop("_refScanBody", None)
+                it.pop("_rawBody", None)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     digest = source_digest(files, root)
@@ -448,13 +521,19 @@ def generate_result(root: Path, out_dir: Path | None = None,
     truncated = False
     if size > _TRUNCATE_BYTES:
         truncated = True
-        reduced = _reduce_for_size(data)
+
+        def _measure(candidate: dict) -> int:
+            return len(render_html(candidate).encode("utf-8"))
+
+        reduced = _reduce_for_size(data, _measure)
         validate(reduced)
         html = render_html(reduced)
         rsize = len(html.encode("utf-8"))
-        logger.warning("dashboard %d bytes exceeds %d; reduced to %d bytes",
-                       size, _TRUNCATE_BYTES, rsize)
-        # Last-resort guard: reducer blanks heavy content so this is rarely hit.
+        logger.warning("dashboard %d bytes exceeds %d; reduced to %d bytes (steps: %s)",
+                       size, _TRUNCATE_BYTES, rsize,
+                       ",".join(reduced["generator"].get("reducedSteps", [])))
+        # Last-resort guard: the graduated trim sheds heavy content so this is
+        # rarely hit even after the final summary-blank step.
         if rsize > _TRUNCATE_BYTES:
             logger.warning("reduced dashboard still %d bytes (over budget)", rsize)
     elif size > _WARN_BYTES:
