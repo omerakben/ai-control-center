@@ -276,6 +276,10 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                 if isinstance(raw, str) and raw:
                     it["_searchBody"] = _redact_escape(raw[:_SEARCH_BODY_CHARS])
                     it["body"] = _redact_escape(raw[:_BODY_CHARS])
+                    # Flag a capped body so the reading pane never hides content
+                    # silently — it links out to the full file instead.
+                    if len(raw) > _BODY_CHARS:
+                        it["bodyTruncated"] = True
                 else:
                     # no raw body: reuse the already-redacted+escaped summary slice
                     it["_searchBody"] = it.get("summary", "")

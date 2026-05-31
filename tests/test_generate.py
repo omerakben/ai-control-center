@@ -433,3 +433,16 @@ def test_reduce_keeps_declares_caps_references():
     assert sum(1 for e in kept if e["type"] == "declares") == 10
     assert sum(1 for e in kept if e["type"] == "reference") == _MAX_DEGRADED_REFERENCE_EDGES
     assert kept == sorted(kept, key=lambda e: (e["from"], e["to"], e["type"]))
+
+
+def test_body_truncated_flag_set_only_when_capped():
+    from acc.generate import _escape_text_fields, _BODY_CHARS
+    long = "x" * (_BODY_CHARS + 100)
+    inv = {"agents": [{"id": "i1", "title": "A", "path": "a.md", "summary": "s", "_rawBody": long},
+                      {"id": "i2", "title": "B", "path": "b.md", "summary": "s", "_rawBody": "short"}],
+           "skills": [], "hooks": [], "commands": [], "mcpServers": [], "rules": []}
+    docs = {"references": []}
+    _escape_text_fields(inv, docs, {"title": "p", "openTodos": []})
+    assert inv["agents"][0].get("bodyTruncated") is True
+    assert "bodyTruncated" not in inv["agents"][1]
+    assert len(inv["agents"][0]["body"]) >= _BODY_CHARS  # capped body still present
