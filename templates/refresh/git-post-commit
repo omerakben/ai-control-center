@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# AI Control Center — opt-in git post-commit hook.
+#
+# Re-stamps the dashboard after each commit and stages it, so the next commit
+# carries an up-to-date control center. The generator is deterministic, so this
+# produces a change only when the repo's AI config actually changed.
+#
+# Enable:
+#   cp templates/refresh/git-post-commit .git/hooks/post-commit
+#   chmod +x .git/hooks/post-commit
+#
+# This runs OUTSIDE Claude Code, so it needs the `acc` generator available. See
+# templates/refresh/README.md. Override the command via ACC, e.g.
+#   ACC="python3 -m acc.cli"   (with PYTHONPATH pointing at a checkout's src/)
+
+set -uo pipefail
+
+ACC="${ACC:-acc}"
+ROOT="$(git rev-parse --show-toplevel)"
+
+if ! command -v "${ACC%% *}" >/dev/null 2>&1; then
+  echo "ai-control-center: '${ACC%% *}' not found on PATH; skipping dashboard refresh" >&2
+  exit 0
+fi
+
+# shellcheck disable=SC2086
+$ACC --root "$ROOT" >/dev/null 2>&1 \
+  || { echo "ai-control-center: dashboard generate failed; skipping" >&2; exit 0; }
+
+# Stage the refreshed dashboard for the next commit (a post-commit hook cannot
+# safely amend the commit in progress). The CI drift check catches any lag.
+git -C "$ROOT" add -- .claude/dashboard.html .codex/dashboard.html .cursor/dashboard.html 2>/dev/null || true
+
+exit 0

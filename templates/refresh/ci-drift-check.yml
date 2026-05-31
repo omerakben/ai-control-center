@@ -1,0 +1,38 @@
+# AI Control Center — opt-in CI drift check.
+#
+# Recomputes the dashboard and fails if the committed copy is stale, so a shared
+# repo never drifts from its AI config. Copy to .github/workflows/acc-drift.yml.
+#
+# Runs outside Claude Code, so it installs the generator from the public repo
+# (stdlib-only, no third-party deps). See templates/refresh/README.md.
+name: AI Control Center drift check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  dashboard-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the generator
+        run: pip install "git+https://github.com/omerakben/ai-control-center"
+
+      - name: Regenerate the dashboard
+        run: acc --root .
+
+      - name: Fail if the committed dashboard is stale
+        run: |
+          if ! git diff --quiet; then
+            echo "::error::dashboard.html is out of date — run /dashboard (or 'acc --root .') and commit the result."
+            git --no-pager diff
+            exit 1
+          fi
+          echo "dashboard is up to date."
