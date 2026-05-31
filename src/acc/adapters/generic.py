@@ -51,6 +51,26 @@ def _first_paragraph(text: str) -> str:
     return ""
 
 
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _lead_sentence(text: str, cap: int = 200) -> str:
+    """First sentence of `text`, whitespace-collapsed and length-capped.
+
+    Real Claude agent/skill `description`s are multi-sentence and carry whole
+    <example> blocks, which makes a wall of a one-line summary. Take the lead
+    sentence so the row stays glanceable; the full body is in the reading pane.
+    Collapsing whitespace also tidies any newline a decoded description carries.
+    """
+    text = " ".join(text.split())
+    if not text:
+        return ""
+    lead = _SENTENCE_END.split(text, 1)[0]
+    if len(lead) > cap:
+        lead = lead[:cap].rsplit(" ", 1)[0].rstrip() + "…"
+    return lead
+
+
 def _extract_todos(text: str, rel: str) -> list[dict]:
     """Open-checkbox (`- [ ]`) lines from already-redacted markdown.
 

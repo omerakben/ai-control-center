@@ -4,10 +4,34 @@ _KEY = re.compile(r"([A-Za-z0-9_-]+):\s*(.*)$")
 _BLOCK_ITEM = re.compile(r"\s*-\s+(.*)$")
 
 
+# YAML double-quoted escape sequences real Claude/Cursor artifacts actually use.
+# (A long agent `description` is often one double-quoted line carrying \n, \", and
+# embedded <example> blocks; without decoding, the literal \n and \" show in the
+# dashboard.) \0/\u are deliberately NOT decoded — they would smuggle control
+# chars (incl. NUL) into the JSON island for no real-world gain.
+_DQ_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "/": "/"}
+
+
+def _unescape_double(s: str) -> str:
+    out: list[str] = []
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == "\\" and i + 1 < n and s[i + 1] in _DQ_ESCAPES:
+            out.append(_DQ_ESCAPES[s[i + 1]])
+            i += 2
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
 def _scalar(s: str):
     s = s.strip()
     if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'":
-        return s[1:-1]
+        inner = s[1:-1]
+        # Double-quoted: decode C-style escapes. Single-quoted: only '' -> '.
+        return _unescape_double(inner) if s[0] == '"' else inner.replace("''", "'")
     if s == "true":
         return True
     if s == "false":
