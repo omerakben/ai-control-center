@@ -134,6 +134,7 @@ def _build_relationships(inv: dict, docs: dict) -> list[dict]:
                 for p in unique}
     for bucket in docs.values():
         for doc in bucket:
+            # _refScanBody is the already-redacted body; never scan the raw body, which can hold secrets.
             body = doc.get("_refScanBody", "")
             if not body:
                 continue
