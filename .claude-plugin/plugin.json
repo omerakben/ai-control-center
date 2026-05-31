@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "ai-control-center",
+  "displayName": "AI Control Center",
+  "version": "1.0.0",
+  "description": "Turn a repo's scattered AI markdown (CLAUDE.md, AGENTS.md, agents, skills, hooks, commands, MCP, rules, PRDs, ADRs) into one self-contained, offline, deterministic HTML dashboard. Stdlib Python, no build step, secrets redacted at extraction.",
+  "author": {
+    "name": "Omer Akben",
+    "url": "https://github.com/omerakben"
+  },
+  "homepage": "https://github.com/omerakben/ai-control-center",
+  "repository": "https://github.com/omerakben/ai-control-center",
+  "license": "MIT",
+  "keywords": [
+    "dashboard",
+    "documentation",
+    "claude-code",
+    "codex",
+    "cursor",
+    "ai-config",
+    "inventory",
+    "offline"
+  ]
+}

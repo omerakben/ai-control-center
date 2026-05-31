@@ -1,0 +1,16 @@
+{
+  "_comment": "AI Control Center — opt-in Claude Code file-write hook. Paste the 'hooks' block into your own .claude/settings.json (or project .claude/settings.local.json) to re-stamp the dashboard after the agent edits a file. The generator is deterministic, so an unchanged repo yields no diff. Requires the 'acc' generator on PATH (see templates/refresh/README.md); $CLAUDE_PROJECT_DIR is supplied by Claude Code. Narrow the matcher or add a path test if you only want to re-stamp on markdown edits.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "acc --root \"$CLAUDE_PROJECT_DIR\" >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

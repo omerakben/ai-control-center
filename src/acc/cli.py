@@ -1,8 +1,9 @@
 import argparse
+import json
 import sys
 from pathlib import Path
 
-from .generate import generate, OwnerAmbiguousError
+from .generate import generate_result, OwnerAmbiguousError
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -11,14 +12,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default=None, help="output directory (default: auto-detect provider folder)")
     parser.add_argument("--owner", default=None,
                         help="provider folder to own the dashboard when more than one exists")
+    parser.add_argument("--json", action="store_true",
+                        help="emit a machine-readable result (path, digest, file count, providers)")
     args = parser.parse_args(argv)
     out_dir = Path(args.out) if args.out else None
     try:
-        dashboard = generate(Path(args.root), out_dir, owner=args.owner)
+        res = generate_result(Path(args.root), out_dir, owner=args.owner)
     except OwnerAmbiguousError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    print(f"wrote {dashboard}")
+    if args.json:
+        print(json.dumps({
+            "dashboardPath": str(res.path),
+            "sourceDigest": res.source_digest,
+            "scannedFileCount": res.scanned_file_count,
+            "providers": res.providers,
+            "truncated": res.truncated,
+        }))
+    else:
+        print(f"wrote {res.path}")
+        print(f"  digest {res.source_digest} · {res.scanned_file_count} files scanned "
+              f"· providers: {', '.join(res.providers)}")
     return 0
 
 

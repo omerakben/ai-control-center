@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
+from typing import NamedTuple
 from .scan import scan_files
 from .digest import source_digest
 from .schema import SCHEMA_VERSION, validate
@@ -46,6 +47,20 @@ _CONFIG_PATHS = frozenset({
 
 class OwnerAmbiguousError(Exception):
     pass
+
+
+class GenerateResult(NamedTuple):
+    """What a generate run produced, for callers that need more than the path.
+
+    `scanned_file_count` is the number of inputs that feed `source_digest`
+    (after dashboards are excluded), so it matches the freshness marker the
+    dashboard displays.
+    """
+    path: Path
+    source_digest: str
+    scanned_file_count: int
+    providers: list[str]
+    truncated: bool
 
 
 def detect_providers(root: Path) -> list[str]:
@@ -302,6 +317,12 @@ def _reduce_for_size(data: dict) -> dict:
 
 
 def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
+    """Generate the dashboard and return its path (back-compat thin wrapper)."""
+    return generate_result(root, out_dir, owner).path
+
+
+def generate_result(root: Path, out_dir: Path | None = None,
+                    owner: str | None = None) -> GenerateResult:
     root = root.resolve()
     all_files = scan_files(root)
 
@@ -358,6 +379,7 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
                 it.pop("_refScanBody", None)
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    digest = source_digest(files, root)
 
     data = {
         "schemaVersion": SCHEMA_VERSION,
@@ -370,7 +392,7 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
                 dashboard.relative_to(root).as_posix()
                 if dashboard.is_relative_to(root) else str(dashboard)
             ),
-            "sourceDigest": source_digest(files, root),
+            "sourceDigest": digest,
             "vcs": {"kind": "none"},
         },
         "providers": provider_summaries,
@@ -383,7 +405,9 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
     validate(data)
     html = render_html(data)
     size = len(html.encode("utf-8"))
+    truncated = False
     if size > _TRUNCATE_BYTES:
+        truncated = True
         reduced = _reduce_for_size(data)
         validate(reduced)
         html = render_html(reduced)
@@ -396,4 +420,10 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
     elif size > _WARN_BYTES:
         logger.warning("dashboard %d bytes exceeds %d", size, _WARN_BYTES)
     dashboard.write_text(html, encoding="utf-8")
-    return dashboard
+    return GenerateResult(
+        path=dashboard,
+        source_digest=digest,
+        scanned_file_count=len(files),
+        providers=[p["id"] for p in provider_summaries],
+        truncated=truncated,
+    )

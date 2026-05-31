@@ -16,6 +16,33 @@ def test_digest_changes_with_content(tmp_path):
     assert before != after
 
 
+def test_local_secret_file_does_not_change_digest(tmp_path):
+    # the committed, public sourceDigest must not depend on a developer's
+    # private .env / settings.local.json — planting one leaves the digest equal.
+    (tmp_path / "a.md").write_text("hello")
+    base = source_digest(scan_files(tmp_path), tmp_path)
+    (tmp_path / ".env").write_text("DB_PASSWORD=hunter2hunter2hunter2hunter2")
+    claude = tmp_path / ".claude"
+    claude.mkdir()
+    (claude / "settings.local.json").write_text('{"x": 1}')
+    after = source_digest(scan_files(tmp_path), tmp_path)
+    assert base == after
+
+
+def test_build_and_local_dir_artifacts_do_not_change_digest(tmp_path):
+    # the committed, public sourceDigest must be reproducible from a clean clone:
+    # a pip-install build egg or a direnv dir on the maintainer's machine must
+    # not perturb it (the dogfood-reproducibility regression).
+    (tmp_path / "a.md").write_text("hello")
+    base = source_digest(scan_files(tmp_path), tmp_path)
+    egg = tmp_path / "thing.egg-info"
+    egg.mkdir()
+    (egg / "PKG-INFO").write_text("Metadata-Version: 2.1")
+    (tmp_path / ".envrc").write_text("export AWS_SECRET_ACCESS_KEY=x")
+    after = source_digest(scan_files(tmp_path), tmp_path)
+    assert base == after
+
+
 def test_digest_disambiguates_nul_in_content(tmp_path):
     # Two different file SETS that collide under naive `rel\0content\0` framing
     # must produce different digests.
