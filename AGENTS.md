@@ -1,11 +1,12 @@
-# AI Control Center
+# Agent Context Center (acc)
 
 A stdlib-Python tool that scans a repository's AI-assistant configuration (Claude Code,
 Codex, Cursor) and generates a deterministic, single-file, offline HTML dashboard of what
 the repo declares — agents, skills, hooks, commands, MCP servers, rules, docs, and open
-TODOs. Public repo: `omerakben/ai-control-center`.
+TODOs. It maps and reviews the AI context; it does not run or control agents. Public repo:
+`omerakben/ai-control-center` (the `acc` CLI stands for Agent Context Center).
 
-> The generated control center for this repo is [`.claude/dashboard.html`](.claude/dashboard.html).
+> The generated dashboard for this repo is [`.claude/dashboard.html`](.claude/dashboard.html).
 > Open it in a browser; run `/dashboard` (or `acc --root .`) to refresh it.
 
 ## What this is

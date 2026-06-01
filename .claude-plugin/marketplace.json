@@ -9,7 +9,7 @@
     {
       "name": "ai-control-center",
       "source": "./",
-      "description": "One self-contained, offline HTML dashboard of a repo's AI configuration — agents, skills, hooks, commands, MCP, rules, docs, and open TODOs. Deterministic output, secrets redacted at extraction."
+      "description": "Agent Context Center \u2014 one self-contained, offline HTML dashboard of a repo's AI configuration \u2014 agents, skills, hooks, commands, MCP, rules, docs, and open TODOs. Deterministic output, secrets redacted at extraction."
     }
   ]
 }

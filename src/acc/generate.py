@@ -436,8 +436,14 @@ def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) 
     return generate_result(root, out_dir, owner).path
 
 
-def generate_result(root: Path, out_dir: Path | None = None,
-                    owner: str | None = None) -> GenerateResult:
+def _assemble(root: Path, out_dir: Path | None = None,
+              owner: str | None = None) -> tuple[dict, Path, int]:
+    """Scan -> normalize -> redact -> validate into the island data dict.
+
+    Returns (data, dashboard_path, scanned_file_count) WITHOUT rendering, writing,
+    or creating directories. This is the read-only core shared by generate_result
+    and `acc doctor`, so the doctor inspects exactly what the dashboard would show.
+    """
     root = root.resolve()
     all_files = scan_files(root)
 
@@ -482,11 +488,9 @@ def generate_result(root: Path, out_dir: Path | None = None,
 
     inv, docs = _merge_parts(parts)
     _escape_text_fields(inv, docs, gpart["project"])  # escape titles/summaries for the island
-    # _escape_text_fields ran first, so todo["text"] is already escaped here — the
-    # todo title enters the index uniformly escaped, like every other record.
-    search = _build_search(inv, docs, project["openTodos"])  # reads the escaped fields (Phase 1 contract)
+    search = _build_search(inv, docs, project["openTodos"])
     relationships = _build_relationships(inv, docs)  # reads docs' _refScanBody
-    # Drop the private slice key so it never reaches the serialized island.
+    # Drop the private slice keys so they never reach the serialized island.
     for bucket in (inv, docs):
         for items in bucket.values():
             for it in items:
@@ -494,9 +498,7 @@ def generate_result(root: Path, out_dir: Path | None = None,
                 it.pop("_refScanBody", None)
                 it.pop("_rawBody", None)
 
-    out_dir.mkdir(parents=True, exist_ok=True)
     digest = source_digest(files, root)
-
     data = {
         "schemaVersion": SCHEMA_VERSION,
         "generator": {"name": "ai-control-center", "version": __version__,
@@ -520,6 +522,13 @@ def generate_result(root: Path, out_dir: Path | None = None,
     }
     _redact_paths(data)
     validate(data)
+    return data, dashboard, len(files)
+
+
+def generate_result(root: Path, out_dir: Path | None = None,
+                    owner: str | None = None) -> GenerateResult:
+    data, dashboard, scanned = _assemble(root, out_dir, owner)
+    dashboard.parent.mkdir(parents=True, exist_ok=True)
     html = render_html(data)
     size = len(html.encode("utf-8"))
     truncated = False
@@ -536,8 +545,6 @@ def generate_result(root: Path, out_dir: Path | None = None,
         logger.warning("dashboard %d bytes exceeds %d; reduced to %d bytes (steps: %s)",
                        size, _TRUNCATE_BYTES, rsize,
                        ",".join(reduced["generator"].get("reducedSteps", [])))
-        # Last-resort guard: the graduated trim sheds heavy content so this is
-        # rarely hit even after the final summary-blank step.
         if rsize > _TRUNCATE_BYTES:
             logger.warning("reduced dashboard still %d bytes (over budget)", rsize)
     elif size > _WARN_BYTES:
@@ -545,8 +552,8 @@ def generate_result(root: Path, out_dir: Path | None = None,
     dashboard.write_text(html, encoding="utf-8")
     return GenerateResult(
         path=dashboard,
-        source_digest=digest,
-        scanned_file_count=len(files),
-        providers=[p["id"] for p in provider_summaries],
+        source_digest=data["source"]["sourceDigest"],
+        scanned_file_count=scanned,
+        providers=[p["id"] for p in data["providers"]],
         truncated=truncated,
     )
