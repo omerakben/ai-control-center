@@ -1,0 +1,64 @@
+# Agent Context Center — keep the committed dashboard honest.
+#
+# Two checks run on every PR and on pushes to main:
+#   1. freshness — regenerate dashboard.html and fail if the committed copy is stale
+#   2. doctor    — run `acc doctor --root . --strict` and fail on any warning
+#
+# acc is stdlib-only Python 3.12+. No third-party deps, no network at runtime.
+
+name: agent-context-dashboard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  freshness:
+    name: dashboard is fresh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install acc
+        run: pip install .
+
+      # Read the real dashboard path straight from acc, regenerate in place,
+      # then ask git whether that one path changed. An empty porcelain line
+      # means the committed dashboard already matches a fresh generation.
+      # (--out is a directory; there is no --output flag. We use the default
+      #  auto-detected provider folder, same as a committed run.)
+      - name: Regenerate and diff the committed dashboard
+        run: |
+          path=$(acc --root . --json | python3 -c 'import json,sys;print(json.load(sys.stdin)["dashboardPath"])')
+          echo "dashboard path: $path"
+          acc --root .
+          if [ -n "$(git status --porcelain -- "$path")" ]; then
+            echo "::error::Committed dashboard is stale. Run 'acc --root .' and commit the result."
+            git --no-pager diff -- "$path"
+            exit 1
+          fi
+          echo "Dashboard is fresh."
+
+  doctor:
+    name: acc doctor --strict
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install acc
+        run: pip install .
+
+      # Exit 1 on any warning, 2 on execution error, 0 when clean.
+      - name: Run doctor
+        run: acc doctor --root . --strict

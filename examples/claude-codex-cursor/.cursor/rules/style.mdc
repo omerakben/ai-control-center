@@ -1,0 +1,13 @@
+---
+description: TypeScript style for the checkout API — naming, imports, error handling.
+globs:
+  - "src/**/*.ts"
+alwaysApply: false
+---
+
+# TypeScript style
+
+- `const` over `let`. No `var`.
+- Named exports only. No default exports.
+- Throw typed errors from `src/errors.ts`; never throw bare strings.
+- Async/await over raw promise chains.

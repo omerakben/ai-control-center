@@ -1,106 +1,162 @@
-# AI Control Center
+# Agent Context Center
 
-One self-contained HTML file that turns a repo's scattered AI markdown into a control
-center a human can actually navigate.
+AI agents have AGENTS.md. Humans need dashboard.html.
+
+A repo's AI context lives in markdown: `CLAUDE.md`, `AGENTS.md`, Cursor rules, skills,
+agents, hooks, commands, MCP config. Agents read that markdown fine. Humans lose the
+thread once a repo holds dozens of these files. Agent Context Center scans the repo and
+emits one self-contained HTML dashboard that mirrors what is there. Markdown stays the
+source of truth; the dashboard is the human map.
 
 ![The dashboard rendered for a multi-provider repo](acc-dashboard-multi.png)
 
-## The problem
+## Quickstart
 
-Markdown is the right format for AI agents. Config, intent, decisions, and capability
-definitions live in `CLAUDE.md`, `AGENTS.md`, Cursor rules, skills, agents, hooks,
-commands, MCP config, PRDs, and ADRs. Agents read and write it well. Humans lose the
-thread once a repo holds dozens of these files spread across `.claude/`, `docs/`, and the
-tree: what exists, how it connects, what was decided, where the project stands.
+Install the generator. It is stdlib Python 3.12+, no third-party dependencies.
 
-## What it does
+```bash
+pip install "git+https://github.com/omerakben/ai-control-center"
+acc --root .
+```
 
-It keeps markdown as the source of truth for the machine and adds one layer for the
-person: a single HTML dashboard that mirrors the markdown and makes it navigable. You
-open one file and see scope, the inventory of skills, agents, hooks, commands, MCP
-servers, and rules, the doc index (PRDs, ADRs, decisions, workflows, references), open
-TODOs, and how the pieces cross-reference each other. There is a global search box and a
-cross-reference view.
+`acc --root .` writes `dashboard.html` into the auto-detected provider folder (e.g.
+`.claude/dashboard.html`, or `.ai-control-center/` if no provider is found). It prints the
+path, the source digest, the file count, and the providers. Open the printed path in a
+browser. No server, no network.
 
-A bundled stdlib-Python generator scans the repo, maps each provider through an adapter
-into one schema, redacts secrets, and stamps a single `dashboard.html` with the data
-inlined as a JSON island and a vanilla-JS renderer. No build step, no runtime
-dependencies, no network.
+Write the dashboard at the repo root instead:
 
-## Install
+```bash
+acc --root . --out .
+```
 
-In Claude Code:
+`--out` takes a directory, not a filename.
+
+### Claude Code plugin
 
 ```text
 /plugin marketplace add omerakben/ai-control-center
 /plugin install ai-control-center@ozzy-skills
-```
-
-Then, from inside any repo you are working in:
-
-```text
 /dashboard
 ```
 
-The command writes `dashboard.html` under the repo's provider folder (`.claude/`,
-`.codex/`, or `.cursor/`) and reports the path, the source digest, and how many files it
-scanned. Open that file in a browser — it needs no server.
+`/dashboard` runs the bundled generator. It needs `python3` 3.12+ on your PATH; if yours is
+older (stock macOS ships 3.9), the command tells you instead of failing with a stack trace.
 
-It runs the bundled generator with stdlib Python 3.12+; if your `python3` is older (stock
-macOS ships 3.9), the command says so and points you at an install instead of failing
-with a stack trace.
+## What it finds
 
-### Without the plugin
+| Source | Status |
+| --- | --- |
+| Claude Code: `CLAUDE.md`, `.claude/agents`, `.claude/commands`, `.claude/skills` (SKILL.md), hooks + MCP from `.claude/settings.json` and `.mcp.json` | Supported today |
+| Codex: `AGENTS.md`, `.codex/prompts`, `.codex/config.toml` (MCP + config facts) | Supported today |
+| Cursor: `.cursorrules`, `.cursor/rules/*.mdc`, `.cursor/mcp.json` | Supported today |
+| Generic markdown indexing for any other `.md` as docs | Supported today |
+| Open TODOs (`- [ ]` checkbox lines only) | Supported today |
+| Flat cross-references (a doc body naming an item's repo-relative path; config "declares" edges) | Supported today |
+| Redaction before rendering (secret-shaped scanner + config allowlist + output tripwire) | Supported today |
+| `GEMINI.md` and `.github/copilot-instructions.md` as first-class adapters | Planned (today: picked up as generic markdown) |
+| PRD / ADR / decision / workflow classification | Planned (today: generic markdown lands in references) |
+| Published, reusable GitHub Action | Planned (today: a copyable workflow template) |
+| Health score | Planned (today: `acc doctor` reports findings, not a number) |
+| JSON export beyond `doctor.v1` findings | Planned |
 
-The generator is a plain Python package, so you can run it directly:
+## Why this exists
+
+AI tools read repo instruction files to do their work. Those files multiply across
+`.claude/`, `.codex/`, `.cursor/`, and `docs/`, and no person tracks all of them. Humans
+need one place to review what exists, what is stale, and what changed. The dashboard is a
+single file you can open, read, diff, and commit alongside the markdown it describes.
+
+## Guarantees
+
+- Static HTML, offline, no network at runtime.
+- No server, no database, no CDN dependency, no build step.
+- No tracking, no telemetry.
+- Redaction runs before rendering.
+- Deterministic and byte-stable: re-stamping an unchanged repo produces identical HTML.
+- `textContent`-only renderer — repo content cannot inject script into the file.
+- Works air-gapped once installed locally.
+- Stdlib Python 3.12+ only.
+
+## What this is not
+
+- Not an agent runtime or orchestrator.
+- Not "control" of agents.
+- Not a cloud service or SaaS.
+- Not a replacement for markdown, Claude Code, Codex, Cursor, Copilot, or MCP.
+- Not a full secret scanner.
+- Not a policy engine or mission control.
+
+It maps, inspects, summarizes, and source-links. It does not manage or run anything.
+
+## acc doctor
+
+`acc doctor` reads the repo and prints deterministic findings — no git history, no mtimes,
+no network, no model judgment, so the same repo always yields the same report. It checks
+for a stale dashboard (embedded digest differs from a fresh scan), a missing, unreadable,
+or truncated dashboard, generator-version drift, weak metadata (an agent, skill, command,
+or rule with no description), near-empty instruction files, large files, conservatively
+detected broken relative markdown links, the count of redacted secret-shaped values, and
+open `- [ ]` TODOs.
 
 ```bash
-pip install "git+https://github.com/omerakben/ai-control-center"   # stdlib only, no deps
-acc --root .                                                        # or: acc --root . --json
+acc doctor --root .            # print findings
+acc doctor --root . --strict   # exit 1 if any warning
+acc doctor --root . --json     # a doctor.v1 report
 ```
 
-## What it guarantees
+Exit codes: `0` clean, or warnings without `--strict`; `1` warnings with `--strict`; `2`
+execution error.
 
-- Deterministic output. Every list is explicitly sorted, so re-stamping a repo with no
-  content change produces byte-identical HTML and no diff.
-- Offline. The generator makes no network calls and needs no build step or framework.
-- Render safety. The renderer writes text with `textContent` and injects only a sanitized
-  markdown subset, so repo content cannot inject script into the committed HTML. A CI
-  guard greps the renderer for `innerHTML`-family sinks.
-- Redaction at extraction. Structured provider config is allowlisted (only known-safe
-  fields pass), and free-form prose runs through a high-precision secret-shaped-string
-  scanner before anything reaches the file; a tripwire re-scans the assembled output. The
-  prose tier favors precision over recall, so a high-entropy value with no telltale prefix
-  can slip through — review a generated dashboard before publishing one from a repo with
-  unusual secrets.
+Sample text output:
 
-## Keeping it fresh
+```text
+Agent Context Center — doctor
+Root: /repo
+Files scanned: 24 · providers: claude, codex
+Dashboard: .claude/dashboard.html
+Status: needs attention
+Findings:
+  ! [stale-dashboard] .claude/dashboard.html is stale (built from a1b2c3, current is d4e5f6) — re-run `acc --root .`.
+  ! [weak-metadata] 2 agent/skill/command/rule file(s) have no description (e.g. .claude/agents/triage.md) — add a `description:` so humans and agents know the intent.
+  · [open-todos] 5 open `- [ ]` TODO(s) found.
+Next: run `acc --root .` to (re)generate the dashboard.
+```
 
-A static `file://` page cannot tell that it is stale, so refresh is explicit. Two tiers
-are active out of the box: the `/dashboard` command, and the agent re-stamping after it
-edits AI markdown. Three more are opt-in templates under
-[`templates/refresh/`](templates/refresh/) — a git post-commit hook, a Claude Code
-file-write hook, and a CI drift check that fails when the committed dashboard falls behind.
+## For teams / CI
 
-## How it is built
+Commit `dashboard.html` next to the markdown it describes. A pull request then shows the
+dashboard diff alongside the context changes, so a reviewer sees what moved without opening
+each file.
 
-- `src/acc/generate.py` orchestrates: scan, per-provider normalize, merge, escape, build
-  the search index and relationships, validate, render.
-- `src/acc/adapters/` holds first-class adapters for Claude Code, Codex, and Cursor over a
-  shared base, plus a generic fallback that inventories any repo's markdown.
-- `src/acc/templates/` holds the HTML template, the renderer, and styles.
-- `tests/` is a flat pytest suite, including a real-Chromium Playwright DOM test and the
-  renderer-sink CI guard.
+A static `file://` page cannot tell it is stale, so refresh is explicit. Add a CI drift
+check that regenerates the dashboard and fails if the committed copy fell behind:
 
-Read the [design spec](docs/superpowers/specs/2026-05-29-ai-control-center-design.md) for
-the schema, adapter interface, generation pipeline, and security model.
+```bash
+acc --root .
+git diff --exit-code -- '**/dashboard.html'
+```
 
-## Scope
+Or run `acc doctor --root . --strict`, which exits `1` on a `stale-dashboard` finding. A
+copyable workflow lives at
+[`.github/workflows/agent-context-dashboard.yml`](.github/workflows/agent-context-dashboard.yml).
+It is a template you adapt; a published, reusable Action is planned.
 
-v1 covers a deterministic inventory, the doc index, a flat relationship list, project
-facts, three-tier refresh, redaction, sanitized rendering, the three first-class adapters
-plus the generic fallback, and a global search — at the project level. A cross-repo view,
-an interactive relationship graph, and richer workflow interpretation are deferred to v2.
+## Security and redaction
+
+Before anything reaches the file, structured provider config is allowlisted — only known
+fields pass — and free-form prose runs through a high-precision secret-shaped-string
+scanner. A tripwire re-scans the assembled output. This is not a full entropy scanner: a
+high-entropy value with no telltale prefix can slip through. Review a generated dashboard
+before publishing one from a repo with unusual secrets.
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
