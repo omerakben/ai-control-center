@@ -13,12 +13,18 @@ on:
   push:
     branches: [main]
 
+# Read-only: both jobs only check out, regenerate, and diff. Nothing is pushed.
+permissions:
+  contents: read
+
 jobs:
   freshness:
     name: dashboard is fresh
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -50,6 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5

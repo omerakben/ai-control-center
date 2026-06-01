@@ -54,12 +54,14 @@ def main(argv: list[str] | None = None) -> int:
 
     d = sub.add_parser("doctor", help="report stale/weak/broken findings for the repo's AI context")
     d.add_argument("--root", default=".", help="repo root to check")
+    d.add_argument("--owner", default=None,
+                   help="provider folder to own the dashboard when more than one exists")
     d.add_argument("--strict", action="store_true", help="exit non-zero when any warning is found")
     d.add_argument("--json", action="store_true", help="emit a machine-readable doctor.v1 report")
 
     args = parser.parse_args(argv)
     if args.command == "doctor":
-        return run_doctor(Path(args.root), strict=args.strict, as_json=args.json)
+        return run_doctor(Path(args.root), owner=args.owner, strict=args.strict, as_json=args.json)
     return _generate(args)
 
 
