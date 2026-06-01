@@ -15,17 +15,23 @@ redacts secrets at extraction — there is no build step and nothing is installe
 Run exactly this in one Bash call:
 
 ```bash
-set -uo pipefail
+set -o pipefail
 
-ROOT="${CLAUDE_PROJECT_DIR:-}"
-if [ -z "$ROOT" ]; then
-  echo "Agent Context Center: CLAUDE_PROJECT_DIR is not set; refusing to scan an unknown directory." >&2
-  exit 1
-fi
+# Project to scan. Claude Code exports CLAUDE_PROJECT_DIR to hooks but not to the
+# Bash tool's shell, so fall back to the working directory — Claude Code runs the
+# Bash tool in the project root, which is exactly what we want to scan.
+ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 
-PLUGIN="${CLAUDE_PLUGIN_ROOT:-}"
+# Bundled generator. Claude Code substitutes ${CLAUDE_PLUGIN_ROOT} with this
+# plugin's install dir when the command loads; the cache glob is a fallback for a
+# client that leaves it unset, and picks the highest installed version.
+PLUGIN="${CLAUDE_PLUGIN_ROOT}"
 if [ -z "$PLUGIN" ] || [ ! -d "$PLUGIN/src/acc" ]; then
-  echo "Agent Context Center: cannot locate the bundled generator (CLAUDE_PLUGIN_ROOT/src/acc)." >&2
+  PLUGIN="$(ls -d "$HOME"/.claude/plugins/cache/*/agent-context-center/*/ 2>/dev/null | sort -V | tail -1)"
+  PLUGIN="${PLUGIN%/}"
+fi
+if [ -z "$PLUGIN" ] || [ ! -d "$PLUGIN/src/acc" ]; then
+  echo "Agent Context Center: cannot locate the bundled generator (src/acc) under \$CLAUDE_PLUGIN_ROOT or ~/.claude/plugins/cache." >&2
   exit 1
 fi
 
@@ -53,7 +59,7 @@ Then:
 
 1. On success the last line is JSON: `{"dashboardPath","sourceDigest","scannedFileCount","providers","truncated"}`. Tell the user the dashboard was written to `dashboardPath` (it lives under the owning provider folder, e.g. `.claude/dashboard.html`), and report `scannedFileCount` files and digest `sourceDigest`. Remind them freshness is manual: re-run `/dashboard` after editing AI markdown, or install an opt-in template from the plugin's `templates/refresh/`.
 2. If it exits with `error: multiple dashboards found (...)`, the repo has more than one provider dashboard. Ask the user which folder owns it, then re-run the same command with `--owner <dir>` (e.g. `--owner .claude`) added before `--json`.
-3. If it prints the "needs Python 3.12+" or "CLAUDE_PROJECT_DIR" message, relay that line verbatim — do not retry or improvise another interpreter.
+3. If it prints the "needs Python 3.12+" or "cannot locate the bundled generator" message, relay that line verbatim — do not retry, improvise another interpreter, or hardcode a plugin path.
 
 Never hand-edit the generated `dashboard.html`. To change its content, edit the source
 AI markdown and re-run `/dashboard` so redaction and the secret tripwire re-fire.
