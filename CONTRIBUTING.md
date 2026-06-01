@@ -44,9 +44,10 @@ Two tests are worth knowing about:
 Run the generator against this repo, or any repo, to see your change end to end:
 
 ```bash
-acc --root .              # writes into the detected provider folder, prints path + digest
-acc --root . --out .      # writes ./dashboard.html at the repo root (--out is a directory)
-acc --root . --json       # machine-readable metadata: dashboardPath, sourceDigest, etc.
+acc --root .                    # writes into the detected provider folder, prints path + digest
+acc --root . --out .            # writes ./dashboard.html at the repo root (--out is a directory)
+acc --root . --json             # machine-readable metadata: dashboardPath, sourceDigest, etc.
+acc --root . --repo-name NAME   # pin the displayed repo name (default: manifest name, else dir name)
 ```
 
 ## Run doctor
@@ -108,8 +109,11 @@ a new one when you add an adapter or a detector.
 
 These are hard requirements, not preferences:
 
-- Output is deterministic and byte-stable. Sort every list explicitly. Re-stamping a repo
-  with no content change must produce an identical file.
+- Output is deterministic and byte-stable across machines. Sort every list explicitly.
+  Re-stamping a repo with no content change must produce an identical file. The island must
+  not depend on the checkout location — the clone directory name, absolute paths, or other
+  per-machine state. `repoName`, for example, resolves from the project manifest rather than
+  `root.name` for this reason.
 - The renderer is `textContent`-only. No `innerHTML`-family sinks in `app.js`. Repo content
   must not be able to inject script into the committed HTML.
 - Redaction runs before render, through `redaction.py` and the `config.py` allowlist.

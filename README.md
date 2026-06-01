@@ -32,6 +32,15 @@ acc --root . --out .
 
 `--out` takes a directory, not a filename.
 
+The dashboard header shows the repo name. It comes from the project manifest
+(`pyproject.toml` `[project].name`, then `package.json` `name`) and falls back to the
+directory name, so the committed output stays identical no matter what a clone directory
+is called. Pin it explicitly with `--repo-name`:
+
+```bash
+acc --root . --repo-name my-repo
+```
+
 ### Claude Code plugin
 
 ```text
