@@ -415,7 +415,7 @@
     var orient = document.getElementById("acc-orient");
     if (orient) {
       orient.textContent = "Offline map of " + htmlUnescape(s.repoName) +
-        "'s AI layer — every card links to its source file. Press / to search.";
+        "'s agent context — every card links to its source file. Press / to search.";
     }
 
     var meta = document.getElementById("acc-meta");
@@ -424,6 +424,7 @@
     var dot = el("span", "acc-dot " + (manual ? "acc-dot-manual" : "acc-dot-fresh"));
     dot.title = manual ? "freshness is manual — re-run the dashboard to refresh" : "tracked";
     meta.appendChild(dot);
+    meta.appendChild(el("span", "acc-pill", "offline · static"));
     meta.appendChild(el("span", "acc-pill", "digest " + s.sourceDigest));
     meta.appendChild(el("span", "acc-pill", "schema v" + data.schemaVersion));
     meta.appendChild(el("span", "acc-pill acc-pill-good", "redaction on"));

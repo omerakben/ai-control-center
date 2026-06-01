@@ -1,12 +1,12 @@
 ---
 name: dashboard
-description: Generate or refresh the AI Control Center dashboard — one offline HTML file inventorying this repo's AI configuration (agents, skills, hooks, commands, MCP servers, rules, docs, open TODOs). Use when asked to build, refresh, regenerate, stamp, or open the AI control center / repo AI dashboard.
+description: Generate or refresh the Agent Context Center dashboard — one offline HTML file inventorying this repo's AI configuration (agents, skills, hooks, commands, MCP servers, rules, docs, open TODOs). Use when asked to build, refresh, regenerate, stamp, or open the Agent Context Center / repo AI dashboard.
 allowed-tools:
   - Bash
   - Read
 ---
 
-# /dashboard — stamp the AI Control Center
+# /dashboard — generate the Agent Context Center dashboard
 
 Run the bundled generator against the **user's project** (never the plugin dir) and
 report what it wrote. The generator is stdlib Python 3.12+, offline, deterministic, and
@@ -19,13 +19,13 @@ set -uo pipefail
 
 ROOT="${CLAUDE_PROJECT_DIR:-}"
 if [ -z "$ROOT" ]; then
-  echo "AI Control Center: CLAUDE_PROJECT_DIR is not set; refusing to scan an unknown directory." >&2
+  echo "Agent Context Center: CLAUDE_PROJECT_DIR is not set; refusing to scan an unknown directory." >&2
   exit 1
 fi
 
 PLUGIN="${CLAUDE_PLUGIN_ROOT:-}"
 if [ -z "$PLUGIN" ] || [ ! -d "$PLUGIN/src/acc" ]; then
-  echo "AI Control Center: cannot locate the bundled generator (CLAUDE_PLUGIN_ROOT/src/acc)." >&2
+  echo "Agent Context Center: cannot locate the bundled generator (CLAUDE_PLUGIN_ROOT/src/acc)." >&2
   exit 1
 fi
 
@@ -41,7 +41,7 @@ for cand in python3.13 python3.12 python3; do
 done
 if [ -z "$PY" ]; then
   found="$(command -v python3 >/dev/null 2>&1 && python3 -c 'import sys;print("%d.%d.%d"%tuple(sys.version_info[:3]))' 2>/dev/null || echo none)"
-  echo "AI Control Center needs Python 3.12+ on PATH (found: $found)." >&2
+  echo "Agent Context Center needs Python 3.12+ on PATH (found: $found)." >&2
   echo "Install it — macOS: 'brew install python@3.12'; or use pyenv — then retry /dashboard." >&2
   exit 1
 fi
