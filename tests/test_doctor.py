@@ -94,6 +94,13 @@ def test_cli_doctor_subcommand_runs(tmp_path):
     assert main(["doctor", "--root", str(tmp_path)]) in (0, 1)
 
 
+def test_cli_repo_name_flag_pins_repo_name(tmp_path):
+    make_claude_repo(tmp_path)
+    assert main(["generate", "--root", str(tmp_path), "--repo-name", "pinned-cli-name"]) == 0
+    html = (tmp_path / ".claude" / "dashboard.html").read_text(encoding="utf-8")
+    assert '"repoName":"pinned-cli-name"' in html
+
+
 def test_dashboard_is_branded_agent_context_center(tmp_path):
     make_claude_repo(tmp_path)
     html = generate(tmp_path).read_text(encoding="utf-8")

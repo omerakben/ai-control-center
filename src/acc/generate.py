@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import NamedTuple
 from .scan import scan_files
+from .config import load_json, load_toml, as_dict
 from .digest import source_digest
 from .redaction import redact_text
 from .schema import SCHEMA_VERSION, validate
@@ -106,6 +107,28 @@ def resolve_owner(root: Path, detected_ids: list[str], owner_override: str | Non
 def detect_out_dir(root: Path) -> Path:
     root = root.resolve()
     return resolve_owner(root, detect_providers(root))
+
+
+def _resolve_repo_name(root: Path, override: str | None = None) -> str:
+    """Stable repo name for the dashboard, independent of the local checkout dir.
+
+    `root.name` (the clone directory) is volatile: a repo cloned into `acc`
+    locally and `ai-control-center` on CI would otherwise produce different
+    dashboards from byte-identical content, breaking the byte-stable-across-
+    machines guarantee (the sourceDigest already is stable — it hashes content +
+    repo-relative paths, not the root dir name). Precedence: explicit override ->
+    `pyproject.toml` `[project].name` -> `package.json` `name` -> the directory
+    name as a last resort. The manifest reads are offline and deterministic.
+    """
+    if override and override.strip():
+        return override
+    py = as_dict(load_toml(root / "pyproject.toml").get("project")).get("name")
+    if isinstance(py, str) and py.strip():
+        return py
+    js = load_json(root / "package.json").get("name")
+    if isinstance(js, str) and js.strip():
+        return js
+    return root.name
 
 
 _FIRST_CLASS = (ClaudeAdapter, CodexAdapter, CursorAdapter)
@@ -431,13 +454,14 @@ def _reduce_for_size(data: dict, measure) -> dict:
     return reduced
 
 
-def generate(root: Path, out_dir: Path | None = None, owner: str | None = None) -> Path:
+def generate(root: Path, out_dir: Path | None = None, owner: str | None = None,
+             repo_name: str | None = None) -> Path:
     """Generate the dashboard and return its path (back-compat thin wrapper)."""
-    return generate_result(root, out_dir, owner).path
+    return generate_result(root, out_dir, owner, repo_name).path
 
 
-def _assemble(root: Path, out_dir: Path | None = None,
-              owner: str | None = None) -> tuple[dict, Path, int]:
+def _assemble(root: Path, out_dir: Path | None = None, owner: str | None = None,
+              repo_name: str | None = None) -> tuple[dict, Path, int]:
     """Scan -> normalize -> redact -> validate into the island data dict.
 
     Returns (data, dashboard_path, scanned_file_count) WITHOUT rendering, writing,
@@ -504,7 +528,7 @@ def _assemble(root: Path, out_dir: Path | None = None,
         "generator": {"name": "ai-control-center", "version": __version__,
                       "rendererDigest": "", "truncated": False},
         "source": {
-            "repoName": root.name,
+            "repoName": _resolve_repo_name(root, repo_name),
             "pathPrefix": _path_prefix(root, out_dir),
             "dashboardPath": (
                 dashboard.relative_to(root).as_posix()
@@ -526,8 +550,9 @@ def _assemble(root: Path, out_dir: Path | None = None,
 
 
 def generate_result(root: Path, out_dir: Path | None = None,
-                    owner: str | None = None) -> GenerateResult:
-    data, dashboard, scanned = _assemble(root, out_dir, owner)
+                    owner: str | None = None,
+                    repo_name: str | None = None) -> GenerateResult:
+    data, dashboard, scanned = _assemble(root, out_dir, owner, repo_name)
     dashboard.parent.mkdir(parents=True, exist_ok=True)
     html = render_html(data)
     size = len(html.encode("utf-8"))

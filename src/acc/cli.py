@@ -10,7 +10,8 @@ from .doctor import run_doctor
 def _generate(args) -> int:
     out_dir = Path(args.out) if args.out else None
     try:
-        res = generate_result(Path(args.root), out_dir, owner=args.owner)
+        res = generate_result(Path(args.root), out_dir, owner=args.owner,
+                              repo_name=args.repo_name)
     except OwnerAmbiguousError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -49,6 +50,9 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--out", default=None, help="output directory (default: auto-detect provider folder)")
     g.add_argument("--owner", default=None,
                    help="provider folder to own the dashboard when more than one exists")
+    g.add_argument("--repo-name", default=None,
+                   help="pin the displayed repo name (default: pyproject/package.json "
+                        "name, else the directory name) so output is stable across clones")
     g.add_argument("--json", action="store_true",
                    help="emit a machine-readable result (path, digest, file count, providers)")
 
