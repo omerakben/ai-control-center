@@ -15,7 +15,7 @@ source of truth; the dashboard is the human map.
 Install the generator. It is stdlib Python 3.12+, no third-party dependencies.
 
 ```bash
-pip install "git+https://github.com/omerakben/ai-control-center"
+pip install "git+https://github.com/omerakben/agent-context-center"
 acc --root .
 ```
 
@@ -35,7 +35,7 @@ acc --root . --out .
 ### Claude Code plugin
 
 ```text
-/plugin marketplace add omerakben/ai-control-center
+/plugin marketplace add omerakben/agent-context-center
 /plugin install ai-control-center@ozzy-skills
 /dashboard
 ```

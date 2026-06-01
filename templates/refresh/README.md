@@ -22,7 +22,7 @@ These templates run **outside** Claude Code's plugin context, so they need the `
 generator reachable on their own. Pick one:
 
 - Install it (stdlib-only, no third-party deps):
-  `pip install "git+https://github.com/omerakben/ai-control-center"` — gives you `acc`.
+  `pip install "git+https://github.com/omerakben/agent-context-center"` — gives you `acc`.
 - Or point at a checkout without installing: set `ACC="python3 -m acc.cli"` and export
   `PYTHONPATH=/path/to/ai-control-center/src` for the git hook; use the same form in the
   Claude Code hook command.

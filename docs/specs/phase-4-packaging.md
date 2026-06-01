@@ -16,7 +16,7 @@ plugin**, with the three-tier refresh, and make the repo installable and shareab
 A friend runs two commands and has a working tool, offline, no build step:
 
 ```
-/plugin marketplace add omerakben/ai-control-center
+/plugin marketplace add omerakben/agent-context-center
 /plugin install ai-control-center@ozzy-skills
 ```
 
@@ -33,7 +33,7 @@ redacted, self-contained `dashboard.html` under the project's provider folder.
 
 ## Layout decision — one repo is both the marketplace and the single plugin
 
-The public repo `omerakben/ai-control-center` doubles as a single-plugin marketplace.
+The public repo `omerakben/agent-context-center` doubles as a single-plugin marketplace.
 Both manifests live in `.claude-plugin/` (no conflict). The marketplace entry's
 `source` is `"./"` (the repo root), so installing clones the whole repo into the
 plugin cache — which is exactly why the generator at `src/acc` is available offline
