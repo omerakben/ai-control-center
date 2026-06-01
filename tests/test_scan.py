@@ -92,6 +92,36 @@ def test_scan_excludes_build_and_local_artifacts(tmp_path):
     assert rels == ["keep.md"]
 
 
+def test_scan_excludes_vs_dotnet_artifact_dirs(tmp_path):
+    # Visual Studio / .NET build output + IDE state. `.vs` holds open-locked
+    # `.vsidx` index files that crash source_digest's read_bytes() on Windows;
+    # bin/obj/TestResults are per-build output and `.vscode` is per-editor state,
+    # all churning the byte-stable digest. These hold tooling output, not the
+    # hand-authored AI context an adapter parses. (`packages` is deliberately
+    # NOT here — see test_scan_keeps_monorepo_packages_tree.)
+    (tmp_path / "keep.md").write_text("k")
+    for bad in (".vs", ".vscode", "bin", "obj",
+                "TestResults", "Screenshots", "TestReports"):
+        d = tmp_path / bad
+        d.mkdir()
+        (d / "skip.md").write_text("s")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert rels == ["keep.md"]
+
+
+def test_scan_keeps_monorepo_packages_tree(tmp_path):
+    # `packages/` must NOT be excluded: pnpm/yarn/turbo monorepos keep
+    # first-class source — including CLAUDE.md / AGENTS.md — under
+    # packages/<name>/, so a bare-name exclude would silently drop real AI
+    # context with no CLI opt-out (generate/doctor call scan_files(root)).
+    (tmp_path / "keep.md").write_text("k")
+    pkg = tmp_path / "packages" / "app"
+    pkg.mkdir(parents=True)
+    (pkg / "CLAUDE.md").write_text("# app context")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert "packages/app/CLAUDE.md" in rels
+
+
 def test_scan_excludes_secret_named_directory(tmp_path):
     # a `.env` used as a DIRECTORY (some secret-manager layouts) would otherwise
     # be descended into and its contents hashed into the digest.
