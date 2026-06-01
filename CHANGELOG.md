@@ -4,6 +4,16 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] — 2026-06-01
+
+### Fixed
+
+- The `/dashboard` command no longer fails with "CLAUDE_PROJECT_DIR is not set" on a clean
+  install. It scans the working directory when `CLAUDE_PROJECT_DIR` is absent (that variable
+  is exported to hooks, not to the command's shell), and locates the bundled generator through
+  the `${CLAUDE_PLUGIN_ROOT}` token Claude Code substitutes, with a `~/.claude/plugins/cache`
+  fallback that selects the highest installed version.
+
 ## [1.3.2] — 2026-06-01
 
 ### Fixed
