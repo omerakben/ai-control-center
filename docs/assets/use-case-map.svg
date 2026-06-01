@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Context Center use-case map</title>
+  <desc id="desc">A diagram showing repo AI context files flowing into dashboard.html, then into review, onboarding, handoff, CI, and audit use cases.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#061018"/>
+      <stop offset="1" stop-color="#0b1716"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00c781"/>
+      <stop offset="1" stop-color="#08b6af"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity=".35"/>
+    </filter>
+    <style>
+      .label { font: 700 28px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: #f1efe4; }
+      .small { font: 500 18px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: #9fb0bd; }
+      .mono { font: 650 18px ui-monospace, "SF Mono", Menlo, monospace; fill: #08b6af; }
+      .chip { font: 700 15px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: #061018; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="520" rx="28" fill="url(#bg)"/>
+  <path d="M40 76 C220 8 355 128 520 64 C710 -10 830 78 978 50 C1110 26 1192 54 1240 88" fill="none" stroke="#11302f" stroke-width="2"/>
+  <path d="M48 442 C244 386 376 488 540 430 C720 366 846 452 1018 410 C1138 382 1200 404 1240 432" fill="none" stroke="#102935" stroke-width="2"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="72" y="112" width="282" height="292" rx="18" fill="#0c131b" stroke="#1d3341"/>
+    <rect x="98" y="138" width="108" height="28" rx="14" fill="url(#accent)"/>
+    <text x="116" y="158" class="chip">INPUTS</text>
+    <text x="98" y="210" class="label">Repo AI context</text>
+    <text x="98" y="254" class="mono">CLAUDE.md</text>
+    <text x="98" y="286" class="mono">AGENTS.md</text>
+    <text x="98" y="318" class="mono">.cursor/rules</text>
+    <text x="98" y="350" class="mono">MCP + hooks</text>
+  </g>
+
+  <path d="M382 258 H492" stroke="#00c781" stroke-width="5" stroke-linecap="round"/>
+  <path d="M492 258 l-18 -13 v26 z" fill="#00c781"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="520" y="88" width="292" height="344" rx="22" fill="#f1efe4"/>
+    <rect x="546" y="116" width="240" height="44" rx="10" fill="#0c131b"/>
+    <circle cx="568" cy="138" r="6" fill="#00c781"/>
+    <circle cx="590" cy="138" r="6" fill="#08b6af"/>
+    <circle cx="612" cy="138" r="6" fill="#5d6e7a"/>
+    <rect x="546" y="186" width="116" height="20" rx="6" fill="#00c781"/>
+    <rect x="678" y="186" width="82" height="20" rx="6" fill="#08b6af"/>
+    <rect x="546" y="232" width="214" height="12" rx="6" fill="#1c2733" opacity=".9"/>
+    <rect x="546" y="260" width="178" height="12" rx="6" fill="#5d6e7a" opacity=".65"/>
+    <rect x="546" y="304" width="240" height="72" rx="12" fill="#d9efe7"/>
+    <text x="566" y="348" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="24" font-weight="800" fill="#061018">dashboard.html</text>
+  </g>
+
+  <path d="M840 258 H948" stroke="#08b6af" stroke-width="5" stroke-linecap="round"/>
+  <path d="M948 258 l-18 -13 v26 z" fill="#08b6af"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="978" y="88" width="230" height="344" rx="18" fill="#0c131b" stroke="#1d3341"/>
+    <rect x="1004" y="116" width="100" height="28" rx="14" fill="url(#accent)"/>
+    <text x="1020" y="136" class="chip">USES</text>
+    <text x="1004" y="188" class="small">Review PRs</text>
+    <text x="1004" y="234" class="small">Onboard agents</text>
+    <text x="1004" y="280" class="small">Audit tools</text>
+    <text x="1004" y="326" class="small">Handoff repos</text>
+    <text x="1004" y="372" class="small">Gate CI drift</text>
+  </g>
+
+  <text x="74" y="470" class="small">Static, deterministic, redacted before render, source-linked for humans.</text>
+</svg>

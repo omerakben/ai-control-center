@@ -4,125 +4,550 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Agent Context Center</title>
-  <meta name="description" content="A stdlib-Python generator that maps a repo's scattered AI context files into one offline, deterministic dashboard.html.">
+  <meta name="description" content="Make a repo's AI context visible, reviewable, and safe to hand off with one offline dashboard.html.">
   <meta property="og:title" content="Agent Context Center">
-  <meta property="og:description" content="AI agents have AGENTS.md. Humans need dashboard.html.">
-  <meta property="og:image" content="../assets/social-preview.svg">
+  <meta property="og:description" content="Make AI context reviewable with one offline dashboard.html.">
+  <meta property="og:image" content="https://omerakben.github.io/agent-context-center/assets/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="Agent Context Center makes AI context reviewable.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Agent Context Center">
+  <meta name="twitter:description" content="Make AI context reviewable with one offline dashboard.html.">
+  <meta name="twitter:image" content="https://omerakben.github.io/agent-context-center/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="Agent Context Center makes AI context reviewable.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2305080c'/%3E%3Cpath d='M8 22V10h16v4H13v4h9v4H8z' fill='%2300c781'/%3E%3C/svg%3E">
   <style>
     :root {
-      --bg: #05080c;
-      --panel: #0c131b;
-      --border: #1c2733;
-      --text: #f1efe4;
+      --ink: #f4efe1;
+      --paper: #f7f0df;
       --muted: #9fb0bd;
-      --emerald: #00c781;
+      --quiet: #c7d2c9;
+      --night: #05080c;
+      --navy: #08121a;
+      --panel: #0d1720;
+      --line: #223241;
+      --green: #00c781;
       --teal: #08b6af;
+      --gold: #e4b84f;
+      --coral: #ff7a61;
     }
+
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    section[id] { scroll-margin-top: 96px; }
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0, rgba(255, 255, 255, .025) 1px, transparent 1px, transparent 92px),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0, rgba(255, 255, 255, .018) 1px, transparent 1px, transparent 92px),
+        linear-gradient(135deg, #05080c 0%, #07131a 52%, #0a1510 100%);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
     }
-    main {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 72px 24px 56px;
+
+    a { color: inherit; }
+    img { display: block; max-width: 100%; }
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, .08);
+      color: var(--teal);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: .9em;
+    }
+    .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(18px);
+      background: rgba(5, 8, 12, .78);
+      border-bottom: 1px solid rgba(244, 239, 225, .1);
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 14px 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 760;
+    }
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--green), var(--teal));
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .2) inset;
+    }
+    .navlinks { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .navlinks a {
+      color: var(--quiet);
+      text-decoration: none;
+      font-size: .94rem;
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+    .navlinks a:hover { background: rgba(255, 255, 255, .07); color: var(--ink); }
+
+    .hero {
+      min-height: min(660px, 74vh);
+      display: flex;
+      align-items: center;
+      position: relative;
+      padding: 76px 0 78px;
+      background:
+        linear-gradient(90deg, rgba(5, 8, 12, .98) 0%, rgba(5, 8, 12, .8) 42%, rgba(5, 8, 12, .18) 74%, rgba(5, 8, 12, .34) 100%),
+        linear-gradient(0deg, rgba(5, 8, 12, .86), rgba(5, 8, 12, 0) 42%, rgba(5, 8, 12, .78)),
+        url("./assets/dashboard-multi.png") center right / min(74vw, 980px) auto no-repeat,
+        #05080c;
+      border-bottom: 1px solid rgba(244, 239, 225, .1);
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      color: var(--green);
+      font-size: .86rem;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 30px;
+      height: 2px;
+      background: linear-gradient(90deg, var(--green), var(--teal));
     }
     h1 {
-      font-size: 2.1rem;
-      margin: 0 0 8px;
-      letter-spacing: -0.01em;
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2.55rem, 7vw, 5.9rem);
+      line-height: .96;
+      font-weight: 850;
     }
-    .tagline {
-      font-size: 1.15rem;
-      color: var(--emerald);
-      margin: 0 0 28px;
-      font-weight: 600;
+    .lead {
+      max-width: 680px;
+      margin: 22px 0 0;
+      color: #d6decd;
+      font-size: clamp(1.05rem, 1.7vw, 1.34rem);
     }
-    p { color: var(--text); margin: 0 0 20px; }
-    .finds {
-      color: var(--muted);
-      font-size: 0.95rem;
-      border-left: 2px solid var(--teal);
-      padding-left: 14px;
-      margin: 0 0 32px;
-    }
-    .links {
+    .actions {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
-      margin: 0 0 40px;
+      margin: 30px 0 0;
     }
-    a.btn {
-      display: inline-block;
-      padding: 11px 18px;
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
       border-radius: 8px;
+      border: 1px solid var(--line);
       text-decoration: none;
-      font-weight: 600;
-      font-size: 0.95rem;
-      border: 1px solid var(--border);
+      font-weight: 720;
     }
-    a.btn.primary {
-      background: var(--emerald);
-      color: #05080c;
-      border-color: var(--emerald);
+    .btn.primary {
+      color: #061018;
+      background: linear-gradient(135deg, var(--green), var(--teal));
+      border-color: transparent;
     }
-    a.btn.secondary {
-      background: var(--panel);
-      color: var(--text);
+    .btn.secondary { color: var(--ink); background: rgba(13, 23, 32, .8); }
+    .btn:hover { transform: translateY(-1px); }
+
+    .command-line {
+      max-width: 640px;
+      margin: 20px 0 0;
+      color: var(--quiet);
+      font-size: .98rem;
     }
-    a.btn:hover { border-color: var(--teal); }
-    a.btn:focus-visible {
-      outline: 2px solid var(--teal);
-      outline-offset: 2px;
+
+    .terminal {
+      max-width: 720px;
+      margin: 28px 0 0;
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: 8px;
+      background: rgba(2, 6, 10, .72);
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, .28);
     }
-    code {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 1px 5px;
+    .terminal-bar {
+      display: flex;
+      gap: 7px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, .05);
+    }
+    .terminal-bar i {
+      width: 10px;
+      height: 10px;
+      border-radius: 99px;
+      background: var(--coral);
+    }
+    .terminal-bar i:nth-child(2) { background: var(--gold); }
+    .terminal-bar i:nth-child(3) { background: var(--green); }
+    pre {
+      margin: 0;
+      padding: 18px;
+      overflow-x: auto;
+      color: #d8ffe9;
+      font: 650 .92rem/1.55 ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    .showcase {
+      padding-top: 26px;
+    }
+    .showcase figure {
+      margin: 0;
+      border: 1px solid rgba(244, 239, 225, .14);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d1720;
+      box-shadow: 0 26px 70px rgba(0, 0, 0, .34);
+    }
+    .showcase figcaption {
+      padding: 12px 14px;
+      color: var(--muted);
+      background: rgba(5, 8, 12, .88);
+      border-top: 1px solid rgba(244, 239, 225, .1);
+      font-size: .94rem;
+    }
+    section { padding: 56px 0; }
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 0 0 22px;
+    }
+    h2 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 3rem);
+      line-height: 1.05;
+    }
+    .section-head p {
+      max-width: 520px;
+      margin: 0;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border: 1px solid rgba(244, 239, 225, .12);
+      border-radius: 8px;
+      padding: 20px;
+      background: rgba(13, 23, 32, .74);
+      min-height: 178px;
+    }
+    .card strong {
+      display: block;
+      margin: 0 0 10px;
+      color: var(--ink);
+      font-size: 1.05rem;
+    }
+    .card p { margin: 0; color: var(--muted); }
+    pre code {
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
       font-family: ui-monospace, "SF Mono", Menlo, monospace;
-      font-size: 0.88em;
       color: var(--teal);
     }
-    footer {
-      color: var(--muted);
-      font-size: 0.85rem;
-      border-top: 1px solid var(--border);
-      padding-top: 18px;
+    .map {
+      margin-top: 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(244, 239, 225, .12);
+      overflow: hidden;
+      background: rgba(13, 23, 32, .7);
     }
-    footer a { color: var(--muted); }
+    .map-mobile {
+      display: none;
+      margin-top: 14px;
+      gap: 10px;
+    }
+    .map-mobile div {
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(244, 239, 225, .12);
+      background: rgba(13, 23, 32, .82);
+      color: var(--muted);
+    }
+    .map-mobile strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      counter-reset: steps;
+    }
+    .step {
+      position: relative;
+      padding: 20px;
+      border-radius: 8px;
+      background: var(--paper);
+      color: #0b1418;
+      min-height: 180px;
+    }
+    .step::before {
+      counter-increment: steps;
+      content: counter(steps);
+      display: inline-grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      margin-bottom: 18px;
+      border-radius: 8px;
+      background: #0b1418;
+      color: var(--green);
+      font-weight: 800;
+    }
+    .step strong { display: block; margin-bottom: 8px; font-size: 1.04rem; }
+    .step p { margin: 0; color: #43515a; }
+
+    .proof {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+    .proof .terminal { margin: 0; }
+    .quote {
+      border-radius: 8px;
+      padding: 28px;
+      background:
+        linear-gradient(135deg, rgba(0, 199, 129, .16), rgba(255, 122, 97, .12)),
+        rgba(13, 23, 32, .78);
+      border: 1px solid rgba(244, 239, 225, .12);
+    }
+    .quote p { margin: 0; font-size: 1.35rem; line-height: 1.35; }
+    .quote span { display: block; margin-top: 18px; color: var(--muted); }
+
+    .boundary {
+      display: grid;
+      grid-template-columns: .85fr 1.15fr;
+      gap: 16px;
+      align-items: start;
+      border: 1px solid rgba(244, 239, 225, .12);
+      border-radius: 8px;
+      padding: 24px;
+      background: rgba(13, 23, 32, .76);
+    }
+    .boundary h2 { font-size: clamp(1.55rem, 2.4vw, 2.35rem); }
+    .boundary p { margin: 0; color: var(--muted); }
+    .boundary ul {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+    .boundary li + li { margin-top: 8px; }
+
+    footer {
+      padding: 42px 0 58px;
+      border-top: 1px solid rgba(244, 239, 225, .1);
+      color: var(--muted);
+    }
+    footer .shell {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    footer a { color: var(--quiet); }
+
+    @media (max-width: 900px) {
+      .proof { grid-template-columns: 1fr; }
+      .boundary { grid-template-columns: 1fr; }
+      .grid, .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-head { display: block; }
+      .section-head p { margin-top: 12px; }
+      .hero {
+        background:
+          linear-gradient(90deg, rgba(5, 8, 12, .96), rgba(5, 8, 12, .82)),
+          url("./assets/dashboard-multi.png") center bottom / 980px auto no-repeat,
+          #05080c;
+      }
+    }
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 28px, 1120px); }
+      section[id] { scroll-margin-top: 140px; }
+      .nav { align-items: flex-start; }
+      .navlinks { justify-content: flex-end; }
+      .navlinks a:nth-child(2), .navlinks a:nth-child(3) { display: none; }
+      .grid, .steps { grid-template-columns: 1fr; }
+      .map > img { display: none; }
+      .map {
+        border: 0;
+        background: transparent;
+      }
+      .map-mobile { display: grid; }
+      .hero { padding-top: 46px; }
+      .showcase { padding-top: 18px; }
+      section { padding: 42px 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .btn:hover { transform: none; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Agent Context Center</h1>
-    <p class="tagline">AI agents have AGENTS.md. Humans need dashboard.html.</p>
-    <p>
-      Agent Context Center scans a repo's scattered AI context files and emits one
-      self-contained, offline, deterministic <code>dashboard.html</code> that you can
-      open, review, and commit. Markdown stays the source of truth for the agents; the
-      dashboard is the map for the people. No server, no build step, no telemetry,
-      stdlib Python 3.12+ only.
-    </p>
-    <p class="finds">
-      What it finds: <code>CLAUDE.md</code>, <code>AGENTS.md</code>, Cursor rules,
-      skills, agents, hooks, commands, MCP servers, the markdown doc index, open
-      <code>- [ ]</code> TODOs, and flat cross-references between them.
-    </p>
-    <div class="links">
-      <a class="btn primary" href="./demo/dashboard.html">View demo dashboard</a>
-      <a class="btn secondary" href="https://github.com/omerakben/agent-context-center">GitHub repo</a>
-      <a class="btn secondary" href="https://github.com/omerakben/agent-context-center#quickstart">Quickstart</a>
+  <header>
+    <div class="shell nav">
+      <div class="brand"><span class="mark" aria-hidden="true"></span> Agent Context Center</div>
+      <nav class="navlinks" aria-label="Primary">
+        <a href="#use-cases">Use cases</a>
+        <a href="#how">How it works</a>
+        <a href="./demo/dashboard.html">Demo</a>
+        <a href="https://github.com/omerakben/agent-context-center">GitHub</a>
+      </nav>
     </div>
-    <footer>
-      static · offline · no telemetry —
-      <a href="https://github.com/omerakben/agent-context-center">omerakben/agent-context-center</a>
-    </footer>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="shell">
+        <p class="eyebrow">Static trust layer for AI-worked repos</p>
+        <h1>Make AI context reviewable.</h1>
+        <p class="lead">
+          Agent Context Center turns <code>AGENTS.md</code>, <code>CLAUDE.md</code>,
+          Cursor rules, MCP servers, hooks, commands, skills, docs, and TODOs into one
+          offline dashboard that humans can open, diff, and commit.
+        </p>
+        <div class="actions">
+          <a class="btn primary" href="./demo/dashboard.html">View demo dashboard</a>
+          <a class="btn secondary" href="https://github.com/omerakben/agent-context-center#quickstart">Install and run</a>
+        </div>
+        <p class="command-line"><code>acc --root .</code> writes a source-linked <code>dashboard.html</code> into the owning provider folder.</p>
+      </div>
+    </section>
+
+    <section class="showcase shell" aria-label="Dashboard preview">
+      <figure>
+        <img src="./assets/dashboard-multi.png" alt="Agent Context Center dashboard with overview, inventory, docs, TODOs, and cross-reference sections">
+        <figcaption>A committed, source-linked dashboard reviewers can open without a server, account, or build step.</figcaption>
+      </figure>
+    </section>
+
+    <section id="use-cases" class="shell">
+      <div class="section-head">
+        <h2>Use it where AI context can drift.</h2>
+        <p>ACC is built for the review moments around coding agents, not for a marketing demo that only looks good once.</p>
+      </div>
+      <div class="grid">
+        <article class="card">
+          <strong>Review agent behavior</strong>
+          <p>Regenerate the dashboard in a PR and inspect what changed across prompts, hooks, commands, MCP, and rules.</p>
+        </article>
+        <article class="card">
+          <strong>Onboard fast</strong>
+          <p>Give a new maintainer or agent one source-linked map instead of a tour through hidden config folders.</p>
+        </article>
+        <article class="card">
+          <strong>Audit tools</strong>
+          <p>See the declared MCP servers and hooks with redacted summaries, grouped by provider and source path.</p>
+        </article>
+        <article class="card">
+          <strong>Handoff cleanly</strong>
+          <p>Commit a deterministic snapshot so the next person sees the repo's AI surface without trusting chat history.</p>
+        </article>
+        <article class="card">
+          <strong>Gate freshness</strong>
+          <p>Use <code>acc doctor --strict</code> to flag stale dashboards and weak metadata in CI.</p>
+        </article>
+        <article class="card">
+          <strong>Explain publicly</strong>
+          <p>Publish a static demo from GitHub Pages with no backend, telemetry, CDN, or runtime service.</p>
+        </article>
+      </div>
+      <div class="map">
+        <img src="./assets/use-case-map.svg" alt="Repo AI context files flow into dashboard.html and then into review, onboarding, audit, handoff, and CI use cases">
+        <div class="map-mobile" aria-label="Use-case map">
+          <div><strong>Repo AI context</strong>AGENTS.md, CLAUDE.md, Cursor rules, MCP, hooks, commands, docs, and TODOs.</div>
+          <div><strong>dashboard.html</strong>One static, redacted, source-linked map generated from the repo.</div>
+          <div><strong>Developer workflows</strong>Review PRs, onboard agents, audit tools, hand off repos, and gate CI drift.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="shell">
+      <div class="section-head">
+        <h2>How it works.</h2>
+        <p>Markdown remains the source of truth. The dashboard is a generated read view for humans.</p>
+      </div>
+      <div class="steps">
+        <article class="step">
+          <strong>Scan the repo</strong>
+          <p>Walks files deterministically while skipping local state, secrets, caches, and build artifacts.</p>
+        </article>
+        <article class="step">
+          <strong>Normalize providers</strong>
+          <p>Claude, Codex, Cursor, and generic markdown become one shared inventory and docs schema.</p>
+        </article>
+        <article class="step">
+          <strong>Redact and validate</strong>
+          <p>Secret-shaped values are redacted before rendering, then a tripwire checks the assembled output.</p>
+        </article>
+        <article class="step">
+          <strong>Commit the artifact</strong>
+          <p>A self-contained dashboard opens offline and can be reviewed like any other generated file.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="shell">
+      <div class="proof">
+        <div class="terminal" aria-label="Doctor command">
+          <div class="terminal-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+          <pre><code>acc doctor --root . --strict
+
+# deterministic checks
+# stale dashboard
+# weak metadata
+# broken relative links
+# redaction count
+# open TODOs</code></pre>
+        </div>
+        <div class="quote">
+          <p>Agents already know how to read the markdown. ACC gives humans the same operating picture, with source links and a file they can review.</p>
+          <span>Static HTML · deterministic output · stdlib Python 3.12+ · no telemetry</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell">
+      <div class="boundary">
+        <div>
+          <p class="eyebrow">Security boundary</p>
+          <h2>Review before publishing.</h2>
+        </div>
+        <ul>
+          <li>ACC redacts secret-shaped strings before rendering and re-scans the assembled output.</li>
+          <li>It is not a full entropy scanner, so unusual secrets still need human review.</li>
+          <li>The dashboard maps and summarizes repo context. It does not run agents, manage tools, or replace source markdown.</li>
+        </ul>
+      </div>
+    </section>
   </main>
+
+  <footer>
+    <div class="shell">
+      <span>Agent Context Center. Markdown for agents, dashboard for humans.</span>
+      <span><a href="https://github.com/omerakben/agent-context-center">GitHub</a> · <a href="./demo/dashboard.html">Demo dashboard</a></span>
+    </div>
+  </footer>
 </body>
 </html>
