@@ -10,6 +10,7 @@ human can review in a browser.
 [View the demo dashboard](https://omerakben.github.io/agent-context-center/demo/dashboard.html)
 · [Open the public site](https://omerakben.github.io/agent-context-center/)
 · [Install from GitHub](#quickstart)
+· [Troubleshooting](#troubleshooting)
 
 ![The dashboard rendered for a multi-provider repo](acc-dashboard-multi.png)
 
@@ -248,6 +249,63 @@ unusual secrets.
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).
+
+## Troubleshooting
+
+Most failures are environment setup, not the generator. Find your error message below.
+
+### `error: externally-managed-environment`
+
+Homebrew and Debian/Ubuntu Python refuse a system-wide `pip install` (PEP 668). You do not
+need a system install. Run it as the [Claude Code plugin](#inside-claude-code-no-install)
+with no pip at all, or install the CLI in isolation:
+
+```bash
+pipx install "git+https://github.com/omerakben/agent-context-center"
+# or:  uv tool install "git+https://github.com/omerakben/agent-context-center"
+```
+
+A plain `python3 -m venv .venv` and activating it works too. See [Standalone CLI](#standalone-cli).
+
+### `Agent Context Center needs Python 3.12+ on PATH`
+
+The generator uses 3.12+ syntax that is checked at import. Install a newer interpreter —
+`brew install python@3.12`, `pyenv install 3.12`, or `uv python install 3.12` — so that
+`python3` (or `python3.12`) resolves to it. The `/dashboard` command tries `python3.13`,
+`python3.12`, then `python3`, and reports the version it found instead of crashing.
+
+### `CLAUDE_PROJECT_DIR is not set`
+
+You are on a plugin build older than 1.3.3. Update it, then retry `/dashboard`:
+
+```text
+/plugin marketplace update ozzy-skills
+/plugin update agent-context-center@ozzy-skills
+```
+
+1.3.3 and later scan the directory you launched Claude Code in and no longer need that
+variable.
+
+### `cannot locate the bundled generator`
+
+The plugin's files were not found on disk. Reinstall or update the plugin so a path like
+`~/.claude/plugins/cache/ozzy-skills/agent-context-center/<version>/src/acc` exists, then
+re-run `/dashboard`.
+
+### `error: multiple dashboards found`
+
+The repo already has a `dashboard.html` under more than one provider folder, so ownership
+is ambiguous. Re-run naming the folder that owns it:
+
+```bash
+acc --root . --owner .claude   # or --owner .codex, --owner .cursor
+```
+
+### `PermissionError` while scanning
+
+A build or IDE file was locked by another process — most often Visual Studio's `.vs`
+index. Update to 1.3.2 or later, which excludes `.vs`, `bin`, `obj`, and other build
+artifacts from the scan.
 
 ## Contributing
 
