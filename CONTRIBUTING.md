@@ -12,7 +12,7 @@ You need Python 3.12 or newer. The runtime has no third-party dependencies. The 
 extra packages are for the test suite.
 
 ```bash
-git clone https://github.com/omerakben/ai-control-center
+git clone https://github.com/omerakben/agent-context-center
 cd ai-control-center
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[test]"

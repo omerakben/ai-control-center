@@ -23,7 +23,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install the generator
-        run: pip install "git+https://github.com/omerakben/ai-control-center"
+        run: pip install "git+https://github.com/omerakben/agent-context-center"
 
       - name: Regenerate the dashboard
         run: acc --root .

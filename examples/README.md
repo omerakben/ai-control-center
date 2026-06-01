@@ -4,7 +4,7 @@ Three tiny, self-contained repos that show what `acc` picks up. Each one is safe
 holds no real secrets, and works offline. Install the CLI once:
 
 ```bash
-pip install "git+https://github.com/omerakben/ai-control-center"   # stdlib only, no deps
+pip install "git+https://github.com/omerakben/agent-context-center"   # stdlib only, no deps
 ```
 
 Then `cd` into any example and run:
