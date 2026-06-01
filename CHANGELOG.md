@@ -4,6 +4,22 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] — 2026-06-01
+
+### Fixed
+
+- The scanner no longer crashes on Visual Studio repositories. `.vs/` is excluded, so
+  `source_digest` never reads the open-locked `.vsidx` index files Visual Studio keeps
+  (a `PermissionError` aborted the whole run on Windows).
+
+### Changed
+
+- Added Visual Studio / .NET build and IDE artifacts to the default scan excludes —
+  `.vs`, `.vscode`, `bin`, `obj`, `TestResults`, `Screenshots`, `TestReports` — so per-build
+  and per-machine output no longer churns the byte-stable `sourceDigest`. `packages/` is
+  deliberately not excluded: it is the source root in pnpm/yarn/turbo monorepos and routinely
+  holds real `CLAUDE.md` / `AGENTS.md`.
+
 ## [1.3.1] — 2026-06-01
 
 ### Changed
