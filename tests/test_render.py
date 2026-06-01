@@ -25,6 +25,16 @@ def test_render_inlines_data_and_template_pieces():
     assert "__CSS__" not in html and "__APP_JS__" not in html and "__DATA_ISLAND__" not in html
 
 
+def test_render_meta_generator_uses_tool_version_not_schema():
+    # The <meta name="generator"> convention carries the SOFTWARE version, so it
+    # must show generator.version (the acc release), never schemaVersion. The
+    # fixture pins them apart (generator 0.1.0 vs schema 1.0) to catch a regression
+    # that interpolates the schema version into the human-facing tag.
+    html = render_html(_data())
+    assert '<meta name="generator" content="Agent Context Center (ai-control-center) 0.1.0">' in html
+    assert "ai-control-center) " + SCHEMA_VERSION + '"' not in html
+
+
 def test_render_neutralizes_script_close_in_island():
     data = _data()
     data["project"]["title"] = "</script><script>alert(1)</script>"
