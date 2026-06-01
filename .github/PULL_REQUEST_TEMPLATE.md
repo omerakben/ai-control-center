@@ -11,7 +11,7 @@
 
 ## Tests run
 
-```
+```shell
 python -m pytest
 ```
 

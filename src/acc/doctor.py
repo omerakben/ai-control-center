@@ -13,6 +13,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import unquote
 
 from . import __version__
 from .generate import _assemble, OwnerAmbiguousError
@@ -51,9 +52,12 @@ def _embedded_island(path: Path) -> dict | None:
     if not m:
         return None
     try:
-        return json.loads(m.group(1).replace("<\\/", "</"))
+        island = json.loads(m.group(1).replace("<\\/", "</"))
     except ValueError:
         return None
+    # A valid-but-non-object island (a list/number from a corrupted file) would
+    # crash the later `.get(...)` calls; treat it as unparseable instead.
+    return island if isinstance(island, dict) else None
 
 
 def _relative_links(text: str):
@@ -74,12 +78,20 @@ def _relative_links(text: str):
         # link syntax, not a live link, so it must not be flagged as broken.
         line = re.sub(r"`[^`]*`", " ", line)
         for url in _LINK_RE.findall(line):
-            head = url.split("/", 1)[0]
-            if ":" in head:            # has a scheme (http:, mailto:, …)
+            # Decode first, then guard on the *decoded* target. Guarding the
+            # still-encoded URL is bypassable — `%2Fetc` -> `/etc`, `..%2F` ->
+            # `../`, `%00` -> NUL — which would let the existence check escape the
+            # repo (an out-of-tree probe on a CI runner). `a%20b.md` -> `a b.md`
+            # is the legitimate case this decode is for.
+            target = unquote(url.split("#", 1)[0].split("?", 1)[0])
+            if not target or "\x00" in target:         # empty, or NUL (crashes resolve())
                 continue
-            if url.startswith(("#", "/")):
+            head = target.split("/", 1)[0]
+            if ":" in head:                             # scheme (http:, mailto:, drive:)
                 continue
-            yield url.split("#", 1)[0]
+            if target.startswith(("#", "/", "\\")):     # in-page anchor or absolute path
+                continue
+            yield target
 
 
 def collect_findings(root: Path, owner: str | None = None) -> tuple[list[Finding], dict]:
@@ -137,12 +149,22 @@ def collect_findings(root: Path, owner: str | None = None) -> tuple[list[Finding
         if f.name in _INSTRUCTION_MARKERS and len(clean.strip()) < _NEAR_EMPTY_CHARS:
             findings.append(Finding("warn", "near-empty-instruction",
                 f"{rel} is nearly empty ({len(clean.strip())} chars) — agents get little context from it."))
+        # Count bytes of the already-normalized text (newline- and encoding-
+        # normalized by read_text above), not f.stat().st_size: the size feeds
+        # the doctor.v1 report, which must stay byte-identical across OSes
+        # regardless of CRLF/LF or invalid-UTF-8 on disk.
         nbytes = len(raw.encode("utf-8"))
         if nbytes > _LARGE_BYTES:
             findings.append(Finding("info", "large-file",
                 f"{rel} is large ({nbytes // 1000} KB) — oversized context files drift easily."))
         for target in _relative_links(clean):
-            if not (f.parent / target).resolve().exists():
+            try:
+                resolved = (f.parent / target).resolve()
+            except (OSError, ValueError):
+                continue                       # unresolvable target: skip, never crash
+            if not resolved.is_relative_to(root):
+                continue                       # link escapes the repo: not ours to probe
+            if not resolved.exists():
                 broken.append(f"{rel} -> {target}")
     if broken:
         findings.append(Finding("warn", "broken-link",
@@ -168,11 +190,12 @@ def collect_findings(root: Path, owner: str | None = None) -> tuple[list[Finding
     return findings, report
 
 
-def run_doctor(root: Path, strict: bool = False, as_json: bool = False) -> int:
+def run_doctor(root: Path, owner: str | None = None,
+               strict: bool = False, as_json: bool = False) -> int:
     """Print a doctor report. Exit 0 (clean / warnings without --strict),
     1 (warnings with --strict), or 2 (execution error)."""
     try:
-        findings, report = collect_findings(root)
+        findings, report = collect_findings(root, owner=owner)
     except OwnerAmbiguousError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

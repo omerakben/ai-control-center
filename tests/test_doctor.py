@@ -107,3 +107,81 @@ def test_doctor_ignores_links_inside_inline_code(tmp_path):
     (tmp_path / "spec.md").write_text(
         "# Spec\n\nThe link `[x](.claude/agents/x.md)` is an example, not a broken link.\n")
     assert "broken-link" not in {f.code for f in collect_findings(tmp_path)[0]}
+
+
+def test_doctor_link_target_is_url_decoded(tmp_path):
+    # A percent-encoded space and a query string must resolve to the real file,
+    # otherwise --strict CI fails on links that are perfectly valid.
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "a.md").write_text("# A\n\nSee [spaces](./a%20b.md) and [query](./b.md?v=1).\n")
+    (docs / "a b.md").write_text("# spaces")
+    (docs / "b.md").write_text("# B")
+    assert "broken-link" not in {f.code for f in collect_findings(tmp_path)[0]}
+
+
+def _two_provider_dashboards(root):
+    for d in (".claude", ".codex"):
+        (root / d).mkdir(parents=True, exist_ok=True)
+        (root / d / "dashboard.html").write_text("<html>")
+
+
+def test_doctor_without_owner_fails_on_multi_dashboard(tmp_path):
+    _two_provider_dashboards(tmp_path)
+    assert run_doctor(tmp_path) == 2                          # OwnerAmbiguousError -> exit 2
+
+
+def test_doctor_owner_disambiguates_multi_dashboard(tmp_path):
+    _two_provider_dashboards(tmp_path)
+    # --owner gives doctor the same recovery `generate` already has.
+    assert run_doctor(tmp_path, owner=".codex") in (0, 1)
+    _, report = collect_findings(tmp_path, owner=".codex")
+    assert report["dashboardPath"] == ".codex/dashboard.html"
+
+
+def test_cli_doctor_owner_flag(tmp_path):
+    _two_provider_dashboards(tmp_path)
+    assert main(["doctor", "--root", str(tmp_path)]) == 2     # ambiguous, no flag
+    assert main(["doctor", "--root", str(tmp_path), "--owner", ".codex"]) in (0, 1)
+
+
+def test_doctor_links_cannot_escape_the_repo_or_crash(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    # Encoded absolute, parent-traversal, and NUL targets must be skipped — never
+    # probed outside the repo and never crash doctor. A naive decode-then-stat would
+    # flag the escaping paths as broken (leaking them) and raise ValueError on %00.
+    (docs / "evil.md").write_text(
+        "# Evil\n\n"
+        "[abs](%2Fno%2Fsuch%2Fzz.md) "
+        "[trav](..%2F..%2F..%2F..%2Fnope-zz.md) "
+        "[nul](file%00.md)\n")
+    findings = collect_findings(tmp_path)[0]                 # must not raise (NUL guard)
+    assert [f for f in findings if f.code == "broken-link"] == []
+    assert run_doctor(tmp_path, strict=True) != 2            # no execution-error crash
+
+
+def test_doctor_validates_in_repo_parent_links(tmp_path):
+    # `../` links that stay inside the repo are still resolved and validated, so the
+    # escape guard does not blanket-skip legitimate parent-directory references.
+    (tmp_path / "top.md").write_text("# Top")
+    sub = tmp_path / "docs" / "specs"
+    sub.mkdir(parents=True)
+    (sub / "x.md").write_text(
+        "# X\n\nUp to [top](../../top.md), and [gone](../../missing-zz.md).\n")
+    broken = [f for f in collect_findings(tmp_path)[0] if f.code == "broken-link"]
+    assert len(broken) == 1                                  # top.md valid; missing-zz.md broken
+    assert "missing-zz.md" in broken[0].message
+
+
+def test_doctor_non_dict_island_is_unreadable_not_a_crash(tmp_path):
+    make_claude_repo(tmp_path)
+    dash = tmp_path / ".claude" / "dashboard.html"
+    dash.parent.mkdir(parents=True, exist_ok=True)
+    # A valid-JSON-but-not-object island (a list from a corrupted file) must read
+    # as unreadable, never crash collect_findings with an AttributeError.
+    dash.write_text(
+        '<script id="acc-data" type="application/json">[1, 2, 3]</script>',
+        encoding="utf-8")
+    assert "unreadable-dashboard" in {f.code for f in collect_findings(tmp_path)[0]}
+    assert run_doctor(tmp_path) == 0                          # warn only -> clean exit
