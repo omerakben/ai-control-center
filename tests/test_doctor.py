@@ -100,3 +100,10 @@ def test_dashboard_is_branded_agent_context_center(tmp_path):
     assert "<title>Agent Context Center</title>" in html
     assert "Generated offline by Agent Context Center (acc)" in html
     assert "no telemetry" in html
+
+
+def test_doctor_ignores_links_inside_inline_code(tmp_path):
+    # `[x](path)` written as inline code is an example of link syntax, not a live link
+    (tmp_path / "spec.md").write_text(
+        "# Spec\n\nThe link `[x](.claude/agents/x.md)` is an example, not a broken link.\n")
+    assert "broken-link" not in {f.code for f in collect_findings(tmp_path)[0]}

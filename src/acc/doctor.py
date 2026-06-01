@@ -70,6 +70,9 @@ def _relative_links(text: str):
             continue
         if in_code:
             continue
+        # Drop inline-code spans: a `[x](path)` written as code is an example of
+        # link syntax, not a live link, so it must not be flagged as broken.
+        line = re.sub(r"`[^`]*`", " ", line)
         for url in _LINK_RE.findall(line):
             head = url.split("/", 1)[0]
             if ":" in head:            # has a scheme (http:, mailto:, …)

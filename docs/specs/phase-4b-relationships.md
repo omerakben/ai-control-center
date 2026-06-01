@@ -131,7 +131,7 @@ than building anything new for navigation.
   word/slash/hyphen (`.bak`, a second extension) — while still allowing a `.` that is a
   sentence terminator (`…x.md.` at end of a sentence), so a path written at the end of a
   sentence still matches. The left boundary rejects a hit preceded by `[\w./-]`. A markdown
-  link `` [x](.claude/agents/x.md) `` matches because the path appears as a delimited token.
+  link `[x](.claude/agents/x.md)` matches because the path appears as a delimited token.
 - On a match, emit `{from: doc.id, to: item.id, type: "reference", evidence: item.path}`.
   Skip self-edges (`from == to`) defensively. Repeated mentions collapse to one edge
   (dedup on the triple); evidence is the item's canonical path, so it is fixed regardless
