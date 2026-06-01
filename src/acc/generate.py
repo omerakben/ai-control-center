@@ -45,7 +45,10 @@ _TRUNCATED_SUMMARY_CHARS = 280
 _PROVIDER_MARKERS = {"claude": "CLAUDE.md", "codex": "AGENTS.md", "cursor": ".cursorrules"}
 _PROVIDER_DIR_BY_ID = {"claude": ".claude", "codex": ".codex", "cursor": ".cursor"}
 _PRECEDENCE = ("claude", "codex", "cursor")
-_KNOWN_OWNER_DIRS = (".claude", ".codex", ".cursor", ".ai-control-center")
+# `.agent-context-center` is the current generic-repo fallback; `.ai-control-center`
+# stays recognized so dashboards committed under the old default are still detected
+# and excluded from the source digest (back-compat after the rename).
+_KNOWN_OWNER_DIRS = (".claude", ".codex", ".cursor", ".agent-context-center", ".ai-control-center")
 
 # The provider config files that declare MCP servers and hooks. They are the
 # `declares` channel, so they are never `reference` targets — otherwise a
@@ -101,7 +104,7 @@ def resolve_owner(root: Path, detected_ids: list[str], owner_override: str | Non
     for pid in _PRECEDENCE:
         if pid in detected_ids:
             return (root / _PROVIDER_DIR_BY_ID[pid]).resolve()
-    return (root / ".ai-control-center").resolve()
+    return (root / ".agent-context-center").resolve()
 
 
 def detect_out_dir(root: Path) -> Path:
@@ -113,7 +116,7 @@ def _resolve_repo_name(root: Path, override: str | None = None) -> str:
     """Stable repo name for the dashboard, independent of the local checkout dir.
 
     `root.name` (the clone directory) is volatile: a repo cloned into `acc`
-    locally and `ai-control-center` on CI would otherwise produce different
+    locally and `agent-context-center` on CI would otherwise produce different
     dashboards from byte-identical content, breaking the byte-stable-across-
     machines guarantee (the sourceDigest already is stable — it hashes content +
     repo-relative paths, not the root dir name). Precedence: explicit override ->
@@ -525,7 +528,7 @@ def _assemble(root: Path, out_dir: Path | None = None, owner: str | None = None,
     digest = source_digest(files, root)
     data = {
         "schemaVersion": SCHEMA_VERSION,
-        "generator": {"name": "ai-control-center", "version": __version__,
+        "generator": {"name": "agent-context-center", "version": __version__,
                       "rendererDigest": "", "truncated": False},
         "source": {
             "repoName": _resolve_repo_name(root, repo_name),

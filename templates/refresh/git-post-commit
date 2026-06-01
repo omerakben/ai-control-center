@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AI Control Center — opt-in git post-commit hook.
+# Agent Context Center — opt-in git post-commit hook.
 #
 # Re-stamps the dashboard after each commit and stages it, so the next commit
 # carries an up-to-date control center. The generator is deterministic, so this
@@ -19,20 +19,20 @@ ACC="${ACC:-acc}"
 ROOT="$(git rev-parse --show-toplevel)"
 
 if ! command -v "${ACC%% *}" >/dev/null 2>&1; then
-  echo "ai-control-center: '${ACC%% *}' not found on PATH; skipping dashboard refresh" >&2
+  echo "agent-context-center: '${ACC%% *}' not found on PATH; skipping dashboard refresh" >&2
   exit 0
 fi
 
 # shellcheck disable=SC2086
 $ACC --root "$ROOT" >/dev/null 2>&1 \
-  || { echo "ai-control-center: dashboard generate failed; skipping" >&2; exit 0; }
+  || { echo "agent-context-center: dashboard generate failed; skipping" >&2; exit 0; }
 
 # Stage the refreshed dashboard for the next commit (a post-commit hook cannot
 # safely amend the commit in progress). The CI drift check catches any lag.
 # Stage each owner path on its own: a single `git add` with several pathspecs
 # aborts entirely when any one is missing, which would stage nothing in the
-# common single-provider repo. `.ai-control-center` is the generic-repo fallback.
-for d in .claude .codex .cursor .ai-control-center; do
+# common single-provider repo. `.agent-context-center` is the generic-repo fallback.
+for d in .claude .codex .cursor .agent-context-center .ai-control-center; do
   git -C "$ROOT" add -- "$d/dashboard.html" 2>/dev/null || true
 done
 

@@ -57,7 +57,7 @@ acc --root .
 ```
 
 `acc --root .` writes `dashboard.html` into the auto-detected provider folder, for
-example `.claude/dashboard.html`, or `.ai-control-center/` if no provider is found. It
+example `.claude/dashboard.html`, or `.agent-context-center/` if no provider is found. It
 prints the path, source digest, scanned file count, and providers. Open the printed path
 in a browser. No server. No network.
 
@@ -81,7 +81,7 @@ acc --root . --repo-name my-repo
 
 ```text
 /plugin marketplace add omerakben/agent-context-center
-/plugin install ai-control-center@ozzy-skills
+/plugin install agent-context-center@ozzy-skills
 /dashboard
 ```
 

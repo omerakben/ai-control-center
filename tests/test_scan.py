@@ -85,7 +85,7 @@ def test_scan_excludes_build_and_local_artifacts(tmp_path):
     direnv = tmp_path / ".direnv"
     direnv.mkdir()
     (direnv / "cache").write_text("c")
-    egg = tmp_path / "ai_control_center.egg-info"
+    egg = tmp_path / "agent_context_center.egg-info"
     egg.mkdir()
     (egg / "PKG-INFO").write_text("Metadata-Version: 2.1")
     rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]

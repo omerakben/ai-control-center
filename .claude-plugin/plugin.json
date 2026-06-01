@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "ai-control-center",
+  "name": "agent-context-center",
   "displayName": "Agent Context Center",
   "version": "1.3.0",
   "description": "Turn a repo's scattered AI markdown (CLAUDE.md, AGENTS.md, agents, skills, hooks, commands, MCP, rules, PRDs, ADRs) into one self-contained, offline, deterministic HTML dashboard. Stdlib Python, no build step, secrets redacted at extraction.",

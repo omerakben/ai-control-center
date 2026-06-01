@@ -29,6 +29,7 @@ __pycache__/
 .venv/
 
 # Generated dashboards (the tool's own output, when run on this repo)
+.agent-context-center/
 .ai-control-center/
 
 # Node (if the generator gains a JS toolchain later)

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`acc` (Agent Context Center) scans a repo's AI-assistant config — Claude Code, Codex, Cursor, generic markdown — and emits one deterministic, offline, single-file `dashboard.html`. Markdown stays the source of truth; the dashboard is the human map. It maps and reviews; it does not run or control agents. The package id is `ai-control-center`; the CLI is `acc`.
+`acc` (Agent Context Center) scans a repo's AI-assistant config — Claude Code, Codex, Cursor, generic markdown — and emits one deterministic, offline, single-file `dashboard.html`. Markdown stays the source of truth; the dashboard is the human map. It maps and reviews; it does not run or control agents. The package id is `agent-context-center`; the CLI is `acc`.
 
 Stdlib Python 3.12+ only. No third-party runtime dependencies. No network at runtime, no build step, no server.
 
@@ -43,7 +43,7 @@ So after any change to scanning, adapters, schema, or templates, **regenerate an
 The flow lives in `src/acc/generate.py::_assemble` (read-only core, shared by `generate_result` and `doctor`):
 
 1. **scan** (`scan.py`) — walk the repo into a file list.
-2. **detect + resolve owner** — `detect_providers` by precedence (claude → codex → cursor); `resolve_owner` picks the output folder (an existing dashboard, else the top detected provider's dir, else `.ai-control-center/`). Two committed dashboards raise `OwnerAmbiguousError` unless `--owner` is given.
+2. **detect + resolve owner** — `detect_providers` by precedence (claude → codex → cursor); `resolve_owner` picks the output folder (an existing dashboard, else the top detected provider's dir, else `.agent-context-center/`). Two committed dashboards raise `OwnerAmbiguousError` unless `--owner` is given.
 3. **normalize** — each first-class adapter (`adapters/claude.py`, `codex.py`, `cursor.py`) maps native files into the shared `inventory` + `docs` schema; `generic.py` indexes only the markdown not claimed by a provider folder/marker.
 4. **merge → escape → search → relationships** — `_merge_parts` concatenates and sorts; `_escape_text_fields` redacts-then-escapes every author-derived display field; `_build_search` and `_build_relationships` run; then transient `_searchBody` / `_refScanBody` / `_rawBody` keys are stripped so they never reach the island.
 5. **redact paths → validate** — `_redact_paths` masks author-controlled paths/evidence; `schema.py::validate` checks shape and runs the secret tripwire.

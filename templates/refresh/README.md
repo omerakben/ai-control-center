@@ -24,7 +24,7 @@ generator reachable on their own. Pick one:
 - Install it (stdlib-only, no third-party deps):
   `pip install "git+https://github.com/omerakben/agent-context-center"` — gives you `acc`.
 - Or point at a checkout without installing: set `ACC="python3 -m acc.cli"` and export
-  `PYTHONPATH=/path/to/ai-control-center/src` for the git hook; use the same form in the
+  `PYTHONPATH=/path/to/agent-context-center/src` for the git hook; use the same form in the
   Claude Code hook command.
 
 The `git-post-commit` hook reads `ACC` (default `acc`) and no-ops with a message if the

@@ -7,7 +7,7 @@ from tests.builders import make_multi_provider_repo
 def _data():
     return {
         "schemaVersion": SCHEMA_VERSION,
-        "generator": {"name": "ai-control-center", "version": "0.1.0", "rendererDigest": "x"},
+        "generator": {"name": "agent-context-center", "version": "0.1.0", "rendererDigest": "x"},
         "source": {"repoName": "r", "dashboardPath": "d.html", "sourceDigest": "abc", "vcs": {"kind": "none"}},
         "providers": [],
         "project": {"title": "Demo", "openTodos": [], "recentDocs": [], "warnings": []},
@@ -31,8 +31,8 @@ def test_render_meta_generator_uses_tool_version_not_schema():
     # fixture pins them apart (generator 0.1.0 vs schema 1.0) to catch a regression
     # that interpolates the schema version into the human-facing tag.
     html = render_html(_data())
-    assert '<meta name="generator" content="Agent Context Center (ai-control-center) 0.1.0">' in html
-    assert "ai-control-center) " + SCHEMA_VERSION + '"' not in html
+    assert '<meta name="generator" content="Agent Context Center (agent-context-center) 0.1.0">' in html
+    assert "agent-context-center) " + SCHEMA_VERSION + '"' not in html
 
 
 def test_render_neutralizes_script_close_in_island():

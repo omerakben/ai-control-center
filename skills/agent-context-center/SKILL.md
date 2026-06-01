@@ -1,5 +1,5 @@
 ---
-name: ai-control-center
+name: agent-context-center
 description: Generate, refresh, or open this repo's Agent Context Center dashboard — a single self-contained offline HTML file that inventories the repo's AI configuration (agents, skills, hooks, commands, MCP servers, rules, docs, open TODOs). Use when the user asks to build, refresh, regenerate, or view that dashboard, and to re-stamp it after editing the repo's AI markdown when a dashboard.html already exists under a provider folder.
 version: 1.0.0
 ---

@@ -23,7 +23,7 @@ acc doctor --root . --json
 
 ## Environment
 
-- acc version: <!-- `pip show ai-control-center` -->
+- acc version: <!-- `pip show agent-context-center` -->
 - Python: <!-- `python3 --version` (3.12+ required) -->
 - OS:
 - Provider folders present: <!-- .claude / .codex / .cursor / none -->

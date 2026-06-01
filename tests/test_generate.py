@@ -45,7 +45,7 @@ def test_detect_out_dir_prefers_provider_folder(tmp_path):
 
 
 def test_detect_out_dir_falls_back(tmp_path):
-    assert detect_out_dir(tmp_path) == (tmp_path / ".ai-control-center").resolve()
+    assert detect_out_dir(tmp_path) == (tmp_path / ".agent-context-center").resolve()
 
 
 def test_generate_includes_provider_folder_markdown(tmp_path):

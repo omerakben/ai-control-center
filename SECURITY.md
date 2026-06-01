@@ -1,6 +1,6 @@
 # Security
 
-Agent Context Center (`ai-control-center`, CLI `acc`) generates a static, offline
+Agent Context Center (`agent-context-center`, CLI `acc`) generates a static, offline
 `dashboard.html` from a repo's AI context files. The dashboard makes no network calls,
 runs no server, and ships no tracking. The renderer writes repo content with `textContent`
 only, so content from the scanned repo cannot inject script into the committed file.

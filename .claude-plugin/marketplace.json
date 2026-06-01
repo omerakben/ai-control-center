@@ -7,7 +7,7 @@
   "description": "Omer Akben's Claude Code plugins.",
   "plugins": [
     {
-      "name": "ai-control-center",
+      "name": "agent-context-center",
       "source": "./",
       "description": "Agent Context Center \u2014 one self-contained, offline HTML dashboard of a repo's AI configuration \u2014 agents, skills, hooks, commands, MCP, rules, docs, and open TODOs. Deterministic output, secrets redacted at extraction."
     }
