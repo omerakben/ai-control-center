@@ -10,6 +10,14 @@ DEFAULT_EXCLUDES = {
     # generated tool caches — their contents change between runs, so indexing
     # them adds noise and breaks the byte-stable sourceDigest guarantee
     ".pytest_cache", ".mypy_cache", ".ruff_cache",
+    # Visual Studio / .NET artifacts. `.vs` holds open-locked `.vsidx` index
+    # files that crash source_digest's read_bytes() on Windows; bin/obj/packages/
+    # TestResults are per-build output that churns the byte-stable digest.
+    # `packages` also matches monorepo source trees (pnpm/yarn/turbo workspaces)
+    # — accepted as a deliberate trade-off; a workspace that keeps AI-context
+    # markdown under `packages/` must pass an explicit `excludes` set.
+    ".vs", ".vscode", "bin", "obj", "packages",
+    "TestResults", "Screenshots", "TestReports",
 }
 
 # `.env` variants that are safe to scan: they hold placeholder values and are

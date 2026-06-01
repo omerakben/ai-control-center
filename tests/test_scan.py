@@ -92,6 +92,21 @@ def test_scan_excludes_build_and_local_artifacts(tmp_path):
     assert rels == ["keep.md"]
 
 
+def test_scan_excludes_vs_dotnet_artifact_dirs(tmp_path):
+    # Visual Studio / .NET build + IDE-state dirs. `.vs` holds open-locked
+    # `.vsidx` index files that crash source_digest's read_bytes() on Windows;
+    # bin/obj/packages/TestResults are per-build artifacts that would churn the
+    # byte-stable digest. None hold AI-context markdown an adapter would parse.
+    (tmp_path / "keep.md").write_text("k")
+    for bad in (".vs", ".vscode", "bin", "obj", "packages",
+                "TestResults", "Screenshots", "TestReports"):
+        d = tmp_path / bad
+        d.mkdir()
+        (d / "skip.md").write_text("s")
+    rels = [p.relative_to(tmp_path).as_posix() for p in scan_files(tmp_path)]
+    assert rels == ["keep.md"]
+
+
 def test_scan_excludes_secret_named_directory(tmp_path):
     # a `.env` used as a DIRECTORY (some secret-manager layouts) would otherwise
     # be descended into and its contents hashed into the digest.
