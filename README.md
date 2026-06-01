@@ -48,18 +48,48 @@ ask reviewers to inspect it like any other generated artifact.
 
 ## Quickstart
 
-Install the generator. It is stdlib Python 3.12+ with no third-party runtime
-dependencies.
+`acc` is stdlib Python 3.12+ with no third-party runtime dependencies. There are two ways
+to run it.
+
+### Inside Claude Code (no install)
+
+```text
+/plugin marketplace add omerakben/agent-context-center
+/plugin install agent-context-center@ozzy-skills
+/dashboard
+```
+
+`/dashboard` runs the bundled generator against the repo you launched Claude Code in. No
+pip install, no network. It needs `python3` 3.12+ on your PATH; if yours is older, the
+command tells you instead of failing with a stack trace.
+
+### Standalone CLI
+
+`acc` is a command-line app, so install it isolated. A bare `pip install` is refused by
+Homebrew and Debian Python (PEP 668, "externally-managed-environment"), so use `pipx` or
+`uv`, which put `acc` on your PATH in its own environment:
 
 ```bash
+pipx install "git+https://github.com/omerakben/agent-context-center"
+# or:  uv tool install "git+https://github.com/omerakben/agent-context-center"
+acc --root .
+```
+
+<details>
+<summary>No pipx or uv? Use a stdlib virtual environment.</summary>
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
 pip install "git+https://github.com/omerakben/agent-context-center"
 acc --root .
 ```
 
-`acc --root .` writes `dashboard.html` into the auto-detected provider folder, for
-example `.claude/dashboard.html`, or `.agent-context-center/` if no provider is found. It
-prints the path, source digest, scanned file count, and providers. Open the printed path
-in a browser. No server. No network.
+</details>
+
+`acc --root .` writes `dashboard.html` into the auto-detected provider folder, for example
+`.claude/dashboard.html`, or `.agent-context-center/` if no provider is found. It prints
+the path, source digest, scanned file count, and providers. Open the printed path in a
+browser. No server. No network.
 
 Write the dashboard at the repo root instead:
 
@@ -76,17 +106,6 @@ when you need byte-stable output across differently named clones:
 ```bash
 acc --root . --repo-name my-repo
 ```
-
-### Claude Code plugin
-
-```text
-/plugin marketplace add omerakben/agent-context-center
-/plugin install agent-context-center@ozzy-skills
-/dashboard
-```
-
-`/dashboard` runs the bundled generator. It needs `python3` 3.12+ on your PATH. If yours
-is older, the command tells you instead of failing with a stack trace.
 
 ## What it maps
 
