@@ -19,6 +19,9 @@ def render_html(data: dict) -> str:
         template
         .replace("/*__CSS__*/", css)
         .replace("/*__APP_JS__*/", app_js)
-        .replace("__SCHEMA_VERSION__", data["schemaVersion"])
+        # The <meta name="generator"> tag carries the tool release (generator.version),
+        # not schemaVersion — those are different axes (the data island still holds
+        # schemaVersion). Done before the island so island content cannot be perturbed.
+        .replace("__GENERATOR_VERSION__", data["generator"]["version"])
         .replace("__DATA_ISLAND__", island)
     )
