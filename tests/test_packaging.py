@@ -22,7 +22,7 @@ def test_main_module_present():
 
 def test_plugin_manifest_is_valid_and_versioned():
     manifest = json.loads((REPO / ".claude-plugin" / "plugin.json").read_text())
-    assert manifest["name"] == "ai-control-center"
+    assert manifest["name"] == "agent-context-center"
     # the plugin version is the single source of truth and must track the package
     assert manifest["version"] == acc.__version__
     assert manifest["license"] == "MIT"
@@ -33,14 +33,14 @@ def test_marketplace_manifest_lists_the_plugin_at_repo_root():
     assert isinstance(market["name"], str) and market["name"]
     assert market["owner"]["name"]
     entries = {p["name"]: p for p in market["plugins"]}
-    assert "ai-control-center" in entries
+    assert "agent-context-center" in entries
     # one repo is both the marketplace and the single plugin -> source is repo root
-    assert entries["ai-control-center"]["source"] == "./"
+    assert entries["agent-context-center"]["source"] == "./"
 
 
 def test_command_and_skill_are_discoverable():
     assert (REPO / "commands" / "dashboard.md").is_file()
-    skill = REPO / "skills" / "ai-control-center" / "SKILL.md"
+    skill = REPO / "skills" / "agent-context-center" / "SKILL.md"
     assert skill.is_file()
     assert skill.read_text().startswith("---")  # has frontmatter
 

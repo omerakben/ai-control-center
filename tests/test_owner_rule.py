@@ -27,6 +27,15 @@ def test_owner_codex_only(tmp_path):
 
 def test_owner_falls_back_when_no_provider(tmp_path):
     out = resolve_owner(tmp_path, [])
+    assert out == (tmp_path / ".agent-context-center").resolve()
+
+
+def test_owner_recognizes_legacy_fallback_dashboard(tmp_path):
+    # Back-compat: a dashboard committed under the old `.ai-control-center/` default
+    # is still detected as the owner after the rename, so it is never orphaned.
+    (tmp_path / ".ai-control-center").mkdir()
+    (tmp_path / ".ai-control-center" / "dashboard.html").write_text("<html>")
+    out = resolve_owner(tmp_path, [])
     assert out == (tmp_path / ".ai-control-center").resolve()
 
 

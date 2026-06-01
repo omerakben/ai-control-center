@@ -1,11 +1,11 @@
-# AI Control Center — opt-in CI drift check.
+# Agent Context Center — opt-in CI drift check.
 #
 # Recomputes the dashboard and fails if the committed copy is stale, so a shared
 # repo never drifts from its AI config. Copy to .github/workflows/acc-drift.yml.
 #
 # Runs outside Claude Code, so it installs the generator from the public repo
 # (stdlib-only, no third-party deps). See templates/refresh/README.md.
-name: AI Control Center drift check
+name: Agent Context Center drift check
 
 on:
   pull_request:

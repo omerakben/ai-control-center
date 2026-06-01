@@ -6,8 +6,8 @@ from acc.ids import stable_id
 def _minimal_data() -> dict:
     return {
         "schemaVersion": SCHEMA_VERSION,
-        "generator": {"name": "ai-control-center", "version": "0.1.0", "rendererDigest": "x"},
-        "source": {"repoName": "r", "dashboardPath": ".ai-control-center/dashboard.html",
+        "generator": {"name": "agent-context-center", "version": "0.1.0", "rendererDigest": "x"},
+        "source": {"repoName": "r", "dashboardPath": ".agent-context-center/dashboard.html",
                    "sourceDigest": "abc", "vcs": {"kind": "none"}},
         "providers": [],
         "project": {"title": "r", "openTodos": [], "recentDocs": [], "warnings": []},

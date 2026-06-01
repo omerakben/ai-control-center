@@ -1,7 +1,7 @@
 # Contributing
 
 Agent Context Center is public developer infrastructure. The repo and package id is
-`ai-control-center`; the CLI is `acc`. It is a stdlib-only Python generator that scans a
+`agent-context-center`; the CLI is `acc`. It is a stdlib-only Python generator that scans a
 repo's AI context files and emits one offline, deterministic `dashboard.html`. Markdown
 stays the source of truth; the dashboard is the human map. Contributions that keep it
 offline, deterministic, and dependency-free are welcome.
@@ -13,7 +13,7 @@ extra packages are for the test suite.
 
 ```bash
 git clone https://github.com/omerakben/agent-context-center
-cd ai-control-center
+cd agent-context-center
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[test]"
 ```

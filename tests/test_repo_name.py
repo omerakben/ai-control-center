@@ -2,7 +2,7 @@
 
 `source.repoName` used to be `root.name` — the local checkout directory name.
 That broke the byte-stable-across-machines guarantee: a repo cloned into `acc`
-locally and `ai-control-center` on CI produced different dashboards from
+locally and `agent-context-center` on CI produced different dashboards from
 identical content, so the committed dashboard could never satisfy both. These
 tests pin repoName to stable repo *content* (an explicit override, then a
 project-manifest name), falling back to the directory name only when nothing
@@ -63,14 +63,14 @@ def test_repo_name_is_identical_across_differently_named_clones(tmp_path):
     # yields the same repoName, so a committed dashboard is reproducible on any
     # machine regardless of the clone directory name.
     names = {}
-    for clone_dir in ("acc", "ai-control-center"):
+    for clone_dir in ("acc", "agent-context-center"):
         repo = tmp_path / clone_dir
         repo.mkdir()
-        (repo / "pyproject.toml").write_text('[project]\nname = "ai-control-center"\n')
+        (repo / "pyproject.toml").write_text('[project]\nname = "agent-context-center"\n')
         (repo / "README.md").write_text("# Demo\n\nSame content everywhere.\n")
         out = generate_result(repo, out_dir=repo)
         names[clone_dir] = _island(out.path)["source"]["repoName"]
-    assert names["acc"] == names["ai-control-center"] == "ai-control-center"
+    assert names["acc"] == names["agent-context-center"] == "agent-context-center"
 
 
 def test_generate_result_honors_repo_name_override(tmp_path):
