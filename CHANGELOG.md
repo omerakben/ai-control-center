@@ -4,6 +4,18 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-06-01
+
+### Changed
+
+- Renamed every public identifier from `ai-control-center` to `agent-context-center` to
+  match the repository and brand: the Python distribution name, the Claude Code plugin
+  (`/plugin install agent-context-center@ozzy-skills`), the bundled skill, the dashboard's
+  `generator.name` and `<meta name="generator">` tag, and the generic-repo fallback output
+  directory (`.agent-context-center/`). The `acc` CLI command and import path are unchanged,
+  and the old `.ai-control-center/` directory is still recognized so dashboards committed
+  under it are not orphaned.
+
 ## [1.3.0] — 2026-05-31
 
 ### Changed
