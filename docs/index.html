@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Context Center</title>
+  <meta name="description" content="A stdlib-Python generator that maps a repo's scattered AI context files into one offline, deterministic dashboard.html.">
+  <meta property="og:title" content="Agent Context Center">
+  <meta property="og:description" content="AI agents have AGENTS.md. Humans need dashboard.html.">
+  <meta property="og:image" content="../assets/social-preview.svg">
+  <style>
+    :root {
+      --bg: #05080c;
+      --panel: #0c131b;
+      --border: #1c2733;
+      --text: #f1efe4;
+      --muted: #9fb0bd;
+      --emerald: #00c781;
+      --teal: #08b6af;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 72px 24px 56px;
+    }
+    h1 {
+      font-size: 2.1rem;
+      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+    }
+    .tagline {
+      font-size: 1.15rem;
+      color: var(--emerald);
+      margin: 0 0 28px;
+      font-weight: 600;
+    }
+    p { color: var(--text); margin: 0 0 20px; }
+    .finds {
+      color: var(--muted);
+      font-size: 0.95rem;
+      border-left: 2px solid var(--teal);
+      padding-left: 14px;
+      margin: 0 0 32px;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0 0 40px;
+    }
+    a.btn {
+      display: inline-block;
+      padding: 11px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid var(--border);
+    }
+    a.btn.primary {
+      background: var(--emerald);
+      color: #05080c;
+      border-color: var(--emerald);
+    }
+    a.btn.secondary {
+      background: var(--panel);
+      color: var(--text);
+    }
+    a.btn:hover { border-color: var(--teal); }
+    a.btn:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+    code {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.88em;
+      color: var(--teal);
+    }
+    footer {
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+    }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Agent Context Center</h1>
+    <p class="tagline">AI agents have AGENTS.md. Humans need dashboard.html.</p>
+    <p>
+      Agent Context Center scans a repo's scattered AI context files and emits one
+      self-contained, offline, deterministic <code>dashboard.html</code> that you can
+      open, review, and commit. Markdown stays the source of truth for the agents; the
+      dashboard is the map for the people. No server, no build step, no telemetry,
+      stdlib Python 3.12+ only.
+    </p>
+    <p class="finds">
+      What it finds: <code>CLAUDE.md</code>, <code>AGENTS.md</code>, Cursor rules,
+      skills, agents, hooks, commands, MCP servers, the markdown doc index, open
+      <code>- [ ]</code> TODOs, and flat cross-references between them.
+    </p>
+    <div class="links">
+      <a class="btn primary" href="./demo/dashboard.html">View demo dashboard</a>
+      <a class="btn secondary" href="https://github.com/omerakben/ai-control-center">GitHub repo</a>
+      <a class="btn secondary" href="https://github.com/omerakben/ai-control-center#quickstart">Quickstart</a>
+    </div>
+    <footer>
+      static · offline · no telemetry —
+      <a href="https://github.com/omerakben/ai-control-center">omerakben/ai-control-center</a>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run lint --silent"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": {
+        "PGHOST": "${PGHOST}",
+        "PGPASSWORD": "${PGPASSWORD}"
+      }
+    }
+  }
+}
