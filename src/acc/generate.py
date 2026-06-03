@@ -521,7 +521,7 @@ def _assemble(root: Path, out_dir: Path | None = None, owner: str | None = None,
     # discards the files, then re-sort to keep output deterministic.
     project = gpart["project"]
     project["openTodos"].extend(harvest_todos(claimed, root))
-    project["openTodos"].sort(key=lambda t: (t["path"], t["text"]))
+    project["openTodos"].sort(key=lambda t: (t["path"], t.get("lineNumber", 0), t["text"]))
     parts.append(gpart)
     provider_summaries.append({"id": "generic", "displayName": "Generic",
                                "root": ".", "detected": True})

@@ -76,12 +76,14 @@ def test_generic_skips_unreadable_file(tmp_path):
 
 def test_extract_todos_carry_stable_id():
     from acc.adapters.generic import _extract_todos
-    todos = _extract_todos("- [ ] first thing\n- [ ] second thing\n", "PLAN.md")
+    todos = _extract_todos("# Plan\n\n- [ ] first thing\n- [ ] second thing\n", "PLAN.md")
     assert len(todos) == 2
     for t in todos:
         assert len(t["id"]) == 12
-        assert set(t.keys()) == {"id", "text", "path", "rawLine"}
+        assert set(t.keys()) == {"id", "text", "path", "rawLine", "lineNumber"}
     assert todos[0]["rawLine"] == "- [ ] first thing"
+    assert todos[0]["lineNumber"] == 3
+    assert todos[1]["lineNumber"] == 4
     # deterministic: same input -> same id
     again = _extract_todos("- [ ] first thing\n", "PLAN.md")
     assert again[0]["id"] == todos[0]["id"]

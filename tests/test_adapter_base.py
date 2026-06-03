@@ -58,4 +58,5 @@ def test_extract_metadata_safe_fields():
         "priority": 5,
         "tags": ["dev", "prod"]
     }
-
+    assert extract_metadata(None) == {}
+    assert extract_metadata(["bad", "frontmatter"]) == {}

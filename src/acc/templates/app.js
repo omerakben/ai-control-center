@@ -7,7 +7,13 @@
   var todoState = {};
   var initialTodos = (data.project && data.project.openTodos) || [];
   initialTodos.forEach(function (t) {
-    todoState[t.id] = { checked: false, path: t.path, text: t.text, rawLine: t.rawLine };
+    todoState[t.id] = {
+      checked: false,
+      path: t.path,
+      text: t.text,
+      rawLine: t.rawLine,
+      lineNumber: t.lineNumber
+    };
   });
 
   function updateTodoCopyButton() {
@@ -38,21 +44,43 @@
       out.push("diff --git a/" + path + " b/" + path);
       out.push("--- a/" + path);
       out.push("+++ b/" + path);
-      out.push("@@ -1,1 +1,1 @@");
+      files[path].sort(function (a, b) {
+        return todoLineNumber(a) - todoLineNumber(b) || String(a.text).localeCompare(String(b.text));
+      });
       files[path].forEach(function (state) {
+        var lineNumber = todoLineNumber(state);
         var raw = htmlUnescape(state.rawLine || ("- [ ] " + state.text));
         var idx = raw.indexOf("[ ]");
-        var mod;
-        if (idx !== -1) {
-          mod = raw.slice(0, idx) + "[x]" + raw.slice(idx + 3);
-        } else {
-          mod = raw.replace("- [ ]", "- [x]");
-        }
+        var mod = idx !== -1 ? raw.slice(0, idx) + "[x]" + raw.slice(idx + 3) : raw;
+        out.push("@@ -" + lineNumber + ",1 +" + lineNumber + ",1 @@");
         out.push("-" + raw);
         out.push("+" + mod);
       });
     });
     return out.join("\n") + "\n";
+  }
+
+  function todoLineNumber(state) {
+    var n = Number(state.lineNumber);
+    return isFinite(n) && n > 0 ? Math.floor(n) : 1;
+  }
+
+  function flashButtonText(btn, text, delay) {
+    var originalText = btn.textContent;
+    btn.textContent = text;
+    setTimeout(function () { btn.textContent = originalText; }, delay);
+  }
+
+  function copyText(text, label, onSuccess, onFailure) {
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+      console.error(label + ": Clipboard API unavailable");
+      if (onFailure) onFailure();
+      return;
+    }
+    navigator.clipboard.writeText(text).then(onSuccess).catch(function (err) {
+      console.error(label + ": ", err);
+      if (onFailure) onFailure();
+    });
   }
 
   function el(tag, cls, text) {
@@ -297,12 +325,14 @@
       Object.keys(opts.metadata).forEach(function (k) {
         var v = opts.metadata[k];
         var badge = el("span", "acc-badge-meta");
-        var keySpan = el("span", "acc-badge-key", k + ":");
+        var keySpan = el("span", "acc-badge-key", htmlUnescape(k) + ":");
         badge.appendChild(keySpan);
 
         var valSpan = el("span", "acc-badge-val");
         if (Array.isArray(v)) {
-          valSpan.textContent = v.join(", ");
+          valSpan.textContent = v.map(function (x) { return htmlUnescape(x); }).join(", ");
+        } else if (typeof v === "string") {
+          valSpan.textContent = htmlUnescape(v);
         } else {
           valSpan.textContent = String(v);
         }
@@ -530,7 +560,7 @@
     copyBtn.addEventListener("click", function () {
       var diffText = buildTodoDiff();
       if (!diffText) return;
-      navigator.clipboard.writeText(diffText).then(function () {
+      copyText(diffText, "Failed to copy todo diff", function () {
         var origText = copyBtn.textContent;
         copyBtn.textContent = "Copied!";
         copyBtn.classList.add("acc-todo-copied");
@@ -538,6 +568,8 @@
           copyBtn.textContent = origText;
           copyBtn.classList.remove("acc-todo-copied");
         }, 1500);
+      }, function () {
+        flashButtonText(copyBtn, "Copy unavailable", 1500);
       });
     });
 
@@ -673,9 +705,11 @@
       var btn = el("button", "acc-cmd-copy-btn", "Copy");
       btn.type = "button";
       btn.addEventListener("click", function () {
-        navigator.clipboard.writeText(cmdText).then(function () {
+        copyText(cmdText, "Failed to copy command", function () {
           btn.textContent = "Copied!";
           setTimeout(function () { btn.textContent = "Copy"; }, 1000);
+        }, function () {
+          flashButtonText(btn, "Unavailable", 1000);
         });
       });
       box.appendChild(code);

@@ -76,15 +76,16 @@ def _extract_todos(text: str, rel: str) -> list[dict]:
     """Open-checkbox (`- [ ]`) lines from already-redacted markdown.
 
     Each TODO carries a stable_id so the omnibox can jump to its rendered row,
-    matching the id contract every inventory/doc item already has.
+    plus its source line so copied diffs can point at the real location.
     """
     out: list[dict] = []
-    for line in text.splitlines():
+    for line_number, line in enumerate(text.splitlines(), start=1):
         m = _TODO.match(line)
         if m:
             todo_text = m.group(1).strip()
             out.append({"id": stable_id("generic", "todo", rel, todo_text),
-                        "text": todo_text, "path": rel, "rawLine": line})
+                        "text": todo_text, "path": rel, "rawLine": line,
+                        "lineNumber": line_number})
     return out
 
 
