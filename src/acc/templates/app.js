@@ -4,6 +4,86 @@
   var pathPrefix = (data.source && data.source.pathPrefix) || "";
   var truncated = !!(data.generator && data.generator.truncated);
 
+  var todoState = {};
+  var initialTodos = (data.project && data.project.openTodos) || [];
+  initialTodos.forEach(function (t) {
+    todoState[t.id] = {
+      checked: false,
+      path: t.path,
+      text: t.text,
+      rawLine: t.rawLine,
+      lineNumber: t.lineNumber
+    };
+  });
+
+  function updateTodoCopyButton() {
+    var count = 0;
+    Object.keys(todoState).forEach(function (id) {
+      if (todoState[id].checked && todoState[id].rawLine) count++;
+    });
+    var copyBtn = document.querySelector(".acc-todo-copy");
+    if (copyBtn) {
+      copyBtn.textContent = "Copy Markdown Diff (" + count + ")";
+      copyBtn.disabled = count === 0;
+    }
+  }
+
+  function buildTodoDiff() {
+    var files = {};
+    Object.keys(todoState).forEach(function (id) {
+      var state = todoState[id];
+      if (state.checked) {
+        if (!state.rawLine) return;
+        if (!files[state.path]) files[state.path] = [];
+        files[state.path].push(state);
+      }
+    });
+    var paths = Object.keys(files).sort();
+    if (!paths.length) return "";
+    var out = [];
+    paths.forEach(function (path) {
+      out.push("diff --git a/" + path + " b/" + path);
+      out.push("--- a/" + path);
+      out.push("+++ b/" + path);
+      files[path].sort(function (a, b) {
+        return todoLineNumber(a) - todoLineNumber(b) || String(a.text).localeCompare(String(b.text));
+      });
+      files[path].forEach(function (state) {
+        var lineNumber = todoLineNumber(state);
+        var raw = htmlUnescape(state.rawLine || ("- [ ] " + state.text));
+        var idx = raw.indexOf("[ ]");
+        var mod = idx !== -1 ? raw.slice(0, idx) + "[x]" + raw.slice(idx + 3) : raw;
+        out.push("@@ -" + lineNumber + ",1 +" + lineNumber + ",1 @@");
+        out.push("-" + raw);
+        out.push("+" + mod);
+      });
+    });
+    return out.join("\n") + "\n";
+  }
+
+  function todoLineNumber(state) {
+    var n = Number(state.lineNumber);
+    return isFinite(n) && n > 0 ? Math.floor(n) : 1;
+  }
+
+  function flashButtonText(btn, text, delay) {
+    var originalText = btn.textContent;
+    btn.textContent = text;
+    setTimeout(function () { btn.textContent = originalText; }, delay);
+  }
+
+  function copyText(text, label, onSuccess, onFailure) {
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+      console.error(label + ": Clipboard API unavailable");
+      if (onFailure) onFailure();
+      return;
+    }
+    navigator.clipboard.writeText(text).then(onSuccess).catch(function (err) {
+      console.error(label + ": ", err);
+      if (onFailure) onFailure();
+    });
+  }
+
   function el(tag, cls, text) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -126,6 +206,7 @@
   }
   // expose the inline renderer for DOM tests
   window.__accRenderInline = function (parent, escaped, q) { mdInline(parent, escaped, q); };
+  window.__accBuildTodoDiff = buildTodoDiff;
 
   // A GFM table delimiter row is only pipes/colons/dashes/space and has both.
   function isTableDelim(s) {
@@ -219,9 +300,48 @@
     var head = el("div", "acc-rowhead");
     if (opts.provider) head.appendChild(el("span", "acc-chip acc-prov", opts.provider));
     if (opts.typeLabel) head.appendChild(el("span", "badge", opts.typeLabel));
+    
+    if (opts.isTodo) {
+      var chk = el("input", "acc-todo-check");
+      chk.type = "checkbox";
+      chk.checked = !!(todoState[opts.id] && todoState[opts.id].checked);
+      chk.setAttribute("aria-label", "Mark as completed");
+      chk.addEventListener("change", function () {
+        if (todoState[opts.id]) {
+          todoState[opts.id].checked = chk.checked;
+          row.classList.toggle("acc-todo-done", chk.checked);
+          updateTodoCopyButton();
+        }
+      });
+      head.appendChild(chk);
+      if (chk.checked) row.classList.add("acc-todo-done");
+    }
+
     var titleEl = el("span", "acc-itemtitle");
     mdInline(titleEl, opts.title, "");
     head.appendChild(titleEl);
+
+    if (opts.metadata && typeof opts.metadata === "object") {
+      var metaBox = el("div", "acc-meta-badges");
+      Object.keys(opts.metadata).forEach(function (k) {
+        var v = opts.metadata[k];
+        var badge = el("span", "acc-badge-meta");
+        var keySpan = el("span", "acc-badge-key", htmlUnescape(k) + ":");
+        badge.appendChild(keySpan);
+
+        var valSpan = el("span", "acc-badge-val");
+        if (Array.isArray(v)) {
+          valSpan.textContent = v.map(function (x) { return htmlUnescape(x); }).join(", ");
+        } else if (typeof v === "string") {
+          valSpan.textContent = htmlUnescape(v);
+        } else {
+          valSpan.textContent = String(v);
+        }
+        badge.appendChild(valSpan);
+        metaBox.appendChild(badge);
+      });
+      head.appendChild(metaBox);
+    }
 
     var detail = null;
     if (opts.body) {
@@ -331,7 +451,8 @@
           id: it.id,
           provider: it.provider, typeLabel: it.typeLabel,
           title: it.title, path: it.path, summary: it.summary,
-          body: it.body, bodyTruncated: it.bodyTruncated
+          body: it.body, bodyTruncated: it.bodyTruncated,
+          metadata: it.metadata
         }));
       });
     });
@@ -360,6 +481,40 @@
     var dirs = Object.keys(byDir).sort();
     var collapse = all.length > 40;  // big repos: groups collapsed by default
 
+    if (dirs.length > 1) {
+      var controls = el("div", "acc-docs-controls");
+      var expBtn = el("button", "acc-action acc-docs-expand");
+      expBtn.type = "button";
+      expBtn.textContent = "Expand All Groups";
+      var collBtn = el("button", "acc-action acc-docs-collapse");
+      collBtn.type = "button";
+      collBtn.textContent = "Collapse All Groups";
+
+      expBtn.addEventListener("click", function () {
+        document.querySelectorAll(".acc-group").forEach(function (g) {
+          g.classList.remove("acc-hidden");
+        });
+        document.querySelectorAll(".acc-grouptoggle").forEach(function (btn) {
+          btn.setAttribute("aria-expanded", "true");
+          btn.classList.add("acc-open");
+        });
+      });
+
+      collBtn.addEventListener("click", function () {
+        document.querySelectorAll(".acc-group").forEach(function (g) {
+          g.classList.add("acc-hidden");
+        });
+        document.querySelectorAll(".acc-grouptoggle").forEach(function (btn) {
+          btn.setAttribute("aria-expanded", "false");
+          btn.classList.remove("acc-open");
+        });
+      });
+
+      controls.appendChild(expBtn);
+      controls.appendChild(collBtn);
+      host.appendChild(controls);
+    }
+
     dirs.forEach(function (dir) {
       var items = byDir[dir].sort(function (a, b) {
         return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
@@ -368,7 +523,8 @@
       items.forEach(function (doc) {
         wrap.appendChild(itemRow({
           id: doc.id, title: doc.title, path: doc.path,
-          summary: doc.summary, body: doc.body, bodyTruncated: doc.bodyTruncated
+          summary: doc.summary, body: doc.body, bodyTruncated: doc.bodyTruncated,
+          metadata: doc.metadata
         }));
       });
       if (collapse) {
@@ -395,6 +551,32 @@
     var host = document.getElementById("acc-todos");
     var todos = (data.project && data.project.openTodos) || [];
     if (!todos.length) { host.appendChild(emptyNote("todos")); return; }
+
+    var controls = el("div", "acc-todo-controls");
+    var copyBtn = el("button", "acc-action acc-todo-copy");
+    copyBtn.type = "button";
+    copyBtn.textContent = "Copy Markdown Diff (0)";
+    copyBtn.disabled = true;
+
+    copyBtn.addEventListener("click", function () {
+      var diffText = buildTodoDiff();
+      if (!diffText) return;
+      copyText(diffText, "Failed to copy todo diff", function () {
+        var origText = copyBtn.textContent;
+        copyBtn.textContent = "Copied!";
+        copyBtn.classList.add("acc-todo-copied");
+        setTimeout(function () {
+          copyBtn.textContent = origText;
+          copyBtn.classList.remove("acc-todo-copied");
+        }, 1500);
+      }, function () {
+        flashButtonText(copyBtn, "Copy unavailable", 1500);
+      });
+    });
+
+    controls.appendChild(copyBtn);
+    host.appendChild(controls);
+
     // Render EVERY TODO (so the omnibox can jump to any of them) inside a
     // height-capped scroll box, so a long list is bounded — not an endless wall.
     if (todos.length > 50) {
@@ -403,7 +585,7 @@
     }
     var box = el("div", "acc-todos");
     todos.forEach(function (t) {
-      box.appendChild(itemRow({ id: t.id, title: t.text, path: t.path }));
+      box.appendChild(itemRow({ id: t.id, title: t.text, path: t.path, isTodo: true }));
     });
     host.appendChild(box);
   }
@@ -515,6 +697,31 @@
       bento.appendChild(xc);
     }
 
+    var ac = card("Actions & Diagnostics", null, "acc-card-actions");
+    ac.appendChild(el("div", "acc-card-line", "Run offline diagnostics:"));
+
+    var addCommandBox = function (parent, cmdText) {
+      var box = el("div", "acc-cmd-box");
+      var code = el("code", "acc-cmd-code", cmdText);
+      var btn = el("button", "acc-cmd-copy-btn", "Copy");
+      btn.type = "button";
+      btn.addEventListener("click", function () {
+        copyText(cmdText, "Failed to copy command", function () {
+          btn.textContent = "Copied!";
+          setTimeout(function () { btn.textContent = "Copy"; }, 1000);
+        }, function () {
+          flashButtonText(btn, "Unavailable", 1000);
+        });
+      });
+      box.appendChild(code);
+      box.appendChild(btn);
+      parent.appendChild(box);
+    };
+
+    addCommandBox(ac, "acc doctor --strict");
+    addCommandBox(ac, "acc --root .");
+    bento.appendChild(ac);
+
     if (bento.children.length) host.appendChild(bento);
   }
 
@@ -534,12 +741,54 @@
 
   function wireSearch() {
     var box = document.getElementById("acc-search");
+    var preSearchOpenStates = null;
+
     box.addEventListener("input", function () {
       var q = box.value.toLowerCase();
+
+      if (q && preSearchOpenStates === null) {
+        preSearchOpenStates = {};
+        document.querySelectorAll(".acc-group").forEach(function (g, idx) {
+          preSearchOpenStates[idx] = !g.classList.contains("acc-hidden");
+        });
+      }
+
       document.querySelectorAll(".acc-item").forEach(function (row) {
         var hit = !q || (row.dataset.search || "").indexOf(q) !== -1;
         row.classList.toggle("acc-hidden", !hit);
       });
+
+      if (q) {
+        document.querySelectorAll(".acc-group").forEach(function (g) {
+          var hasMatch = g.querySelectorAll(".acc-item:not(.acc-hidden)").length > 0;
+          if (hasMatch) {
+            g.classList.remove("acc-hidden");
+            var btn = g.previousElementSibling;
+            if (btn && btn.classList.contains("acc-grouptoggle")) {
+              btn.setAttribute("aria-expanded", "true");
+              btn.classList.add("acc-open");
+            }
+          } else {
+            g.classList.add("acc-hidden");
+            var btn = g.previousElementSibling;
+            if (btn && btn.classList.contains("acc-grouptoggle")) {
+              btn.setAttribute("aria-expanded", "false");
+              btn.classList.remove("acc-open");
+            }
+          }
+        });
+      } else if (preSearchOpenStates !== null) {
+        document.querySelectorAll(".acc-group").forEach(function (g, idx) {
+          var wasOpen = preSearchOpenStates[idx];
+          g.classList.toggle("acc-hidden", !wasOpen);
+          var btn = g.previousElementSibling;
+          if (btn && btn.classList.contains("acc-grouptoggle")) {
+            btn.setAttribute("aria-expanded", String(wasOpen));
+            btn.classList.toggle("acc-open", wasOpen);
+          }
+        });
+        preSearchOpenStates = null;
+      }
     });
   }
 

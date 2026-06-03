@@ -531,3 +531,114 @@ def test_short_body_has_no_truncation_footer(page, tmp_path):
     row = page.locator('.acc-item', has_text="smallbody").first
     row.locator('.acc-toggle').click()
     assert row.locator('.acc-detail-more').count() == 0
+
+
+def test_metadata_badges_render_in_dom(page, tmp_path):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "meta_agent.md").write_text(
+        "---\nname: meta_agent\nstatus: \"active & ready\"\npriority: 5\nversion: 1.2.3\ntags: [tag1 & tag2, tag3]\n---\n# Body\n"
+    )
+    page.set_content(_html(tmp_path))
+    row = page.locator('.acc-item', has_text="meta_agent").first
+    meta_badges = row.locator('.acc-meta-badges')
+    assert meta_badges.count() == 1
+    assert meta_badges.locator('.acc-badge-meta', has_text="status:active & ready").count() == 1
+    assert meta_badges.locator('.acc-badge-meta', has_text="priority:5").count() == 1
+    assert meta_badges.locator('.acc-badge-meta', has_text="version:1.2.3").count() == 1
+    assert meta_badges.locator('.acc-badge-meta', has_text="tags:tag1 & tag2, tag3").count() == 1
+    assert "&amp;" not in meta_badges.inner_text()
+
+
+def test_todo_interaction_and_diff(page, tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] task one\n- [ ] task two\n")
+    page.set_content(_html(tmp_path))
+
+    check = page.locator('.acc-todo-check').first
+    assert check.count() == 1
+    assert not check.is_checked()
+
+    btn = page.locator('.acc-todo-copy')
+    assert btn.count() == 1
+    assert btn.is_disabled()
+
+    check.check()
+    assert check.is_checked()
+    assert not btn.is_disabled()
+    assert "Copy Markdown Diff (1)" in btn.inner_text()
+
+    diff_text = page.evaluate("() => window.__accBuildTodoDiff()")
+    assert "diff --git a/CLAUDE.md b/CLAUDE.md" in diff_text
+    assert "@@ -3,1 +3,1 @@" in diff_text
+    assert "-- [ ] task one" in diff_text
+    assert "+- [x] task one" in diff_text
+
+
+def test_redacted_todos_do_not_emit_patch_diff(page, tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] rotate token=abcdefghijkl\n")
+    page.set_content(_html(tmp_path))
+
+    check = page.locator('.acc-todo-check').first
+    btn = page.locator('.acc-todo-copy')
+    check.check()
+    assert check.is_checked()
+    assert btn.is_disabled()
+    assert "Copy Markdown Diff (0)" in btn.inner_text()
+    assert page.evaluate("() => window.__accBuildTodoDiff()") == ""
+
+
+def test_copy_buttons_handle_missing_or_rejected_clipboard(page, tmp_path):
+    errors = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] task one\n")
+    page.set_content(_html(tmp_path))
+
+    page.evaluate("""() => {
+      Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    }""")
+    page.locator('.acc-todo-check').first.check()
+    page.locator('.acc-todo-copy').click()
+    assert "Copy unavailable" in page.locator('.acc-todo-copy').inner_text()
+
+    page.evaluate("""() => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: function () { return Promise.reject(new Error("denied")); } },
+        configurable: true
+      });
+    }""")
+    page.locator('.acc-cmd-copy-btn').first.click()
+    page.wait_for_function("""() => {
+      var btn = document.querySelector(".acc-cmd-copy-btn");
+      return btn && btn.textContent === "Unavailable";
+    }""")
+    assert errors == []
+
+
+def test_actions_card_renders_with_commands(page, tmp_path):
+    (tmp_path / "README.md").write_text("# Readme\n")
+    page.set_content(_html(tmp_path))
+    actions_card = page.locator('.acc-card-actions')
+    assert actions_card.count() == 1
+    assert actions_card.locator('.acc-cmd-code', has_text="acc doctor --strict").count() == 1
+    assert actions_card.locator('.acc-cmd-code', has_text="acc --root .").count() == 1
+
+
+def test_global_expand_collapse_groups(page, tmp_path):
+    (tmp_path / "dir1").mkdir()
+    (tmp_path / "dir2").mkdir()
+    (tmp_path / "dir1" / "doc1.md").write_text("# Doc 1\nbody")
+    (tmp_path / "dir2" / "doc2.md").write_text("# Doc 2\nbody")
+
+    page.set_content(_html(tmp_path))
+    expand_btn = page.locator('.acc-docs-expand')
+    collapse_btn = page.locator('.acc-docs-collapse')
+    assert expand_btn.count() == 1
+    assert collapse_btn.count() == 1
+
+    collapse_btn.click()
+    assert page.locator('.acc-group.acc-hidden').count() == 2
+    expand_btn.click()
+    assert page.locator('.acc-group:not(.acc-hidden)').count() == 2

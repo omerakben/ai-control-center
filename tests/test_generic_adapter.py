@@ -50,6 +50,16 @@ def test_generic_strips_front_matter(tmp_path):
     assert ref["summary"] == "Real body text."
 
 
+def test_generic_frontmatter_fallbacks_require_strings(tmp_path):
+    (tmp_path / "doc.md").write_text(
+        "---\ntitle: [bad]\ndescription: true\n---\nBody fallback summary.\n"
+    )
+    part = GenericAdapter().normalize(_ctx(tmp_path), GenericAdapter().detect(_ctx(tmp_path))[0])
+    ref = part["docs"]["references"][0]
+    assert ref["title"] == "doc.md"
+    assert ref["summary"] == "Body fallback summary."
+
+
 def test_generic_summary_skips_list_and_code_fence(tmp_path):
     (tmp_path / "plan.md").write_text(
         "# Plan\n\n- [ ] task one\n```\ncode\n```\n\nActual prose summary.\n"
@@ -76,11 +86,25 @@ def test_generic_skips_unreadable_file(tmp_path):
 
 def test_extract_todos_carry_stable_id():
     from acc.adapters.generic import _extract_todos
-    todos = _extract_todos("- [ ] first thing\n- [ ] second thing\n", "PLAN.md")
+    todos = _extract_todos("# Plan\n\n- [ ] first thing\n- [ ] second thing\n", "PLAN.md")
     assert len(todos) == 2
     for t in todos:
         assert len(t["id"]) == 12
-        assert set(t.keys()) == {"id", "text", "path"}
+        assert set(t.keys()) == {"id", "text", "path", "rawLine", "lineNumber"}
+    assert todos[0]["rawLine"] == "- [ ] first thing"
+    assert todos[0]["lineNumber"] == 3
+    assert todos[1]["lineNumber"] == 4
     # deterministic: same input -> same id
     again = _extract_todos("- [ ] first thing\n", "PLAN.md")
     assert again[0]["id"] == todos[0]["id"]
+
+
+def test_redacted_todos_do_not_keep_raw_line():
+    from acc.adapters.generic import _extract_todos
+    from acc.redaction import redact_text
+    raw = "- [ ] rotate token=abcdefghijkl\n"
+    clean, hits = redact_text(raw)
+    assert hits == 1
+    todos = _extract_todos(clean, "PLAN.md", raw)
+    assert todos[0]["text"] == "rotate [redacted]"
+    assert "rawLine" not in todos[0]

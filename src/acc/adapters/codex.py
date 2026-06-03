@@ -1,8 +1,9 @@
-from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs
+from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs, extract_metadata
 from ..ids import rel_posix
 from ..redaction import redact_text
+from ..frontmatter import parse_frontmatter
 from ..config import load_toml, safe_mcp, mcp_summary, as_dict
-from .generic import _first_heading, _first_paragraph, _strip_front_matter
+from .generic import _first_heading, _first_paragraph, _frontmatter_str, _strip_front_matter
 
 _CONFIG_FACTS = ("model", "model_reasoning_effort", "sandbox", "approval_policy")
 
@@ -39,11 +40,17 @@ class CodexAdapter:
                     raw = p.read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
-                clean, _ = redact_text(raw)
-                # prompts are invoked by filename, so the stem is the title
-                item = make_item("codex", "command", "Codex prompt", p.stem, rel,
-                                 _first_paragraph(clean))
+                fields, body_text = parse_frontmatter(raw)
+                clean, _ = redact_text(body_text)
+                title = _frontmatter_str(fields, "name") or _frontmatter_str(fields, "title") or p.stem
+                summary = (_frontmatter_str(fields, "description")
+                           or _frontmatter_str(fields, "summary")
+                           or _first_paragraph(clean))
+                item = make_item("codex", "command", "Codex prompt", title, rel, summary)
                 item["_rawBody"] = _strip_front_matter(clean)
+                meta = extract_metadata(fields)
+                if meta:
+                    item["metadata"] = meta
                 inv["commands"].append(item)
             elif rel == "AGENTS.md" or (rel.startswith(".codex/") and rel.endswith("/AGENTS.md")):
                 try:

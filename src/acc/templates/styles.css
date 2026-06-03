@@ -54,11 +54,16 @@ body::before {
 }
 a { color: inherit; }
 
-/* Sticky header — glass bar with the repo name in an accent gradient. */
-header.acc-head {
+.acc-sticky-container {
   position: sticky;
   top: 0;
   z-index: 30;
+}
+
+/* Sticky header — glass bar with the repo name in an accent gradient. */
+header.acc-head {
+  position: relative;
+  z-index: 31;
   background: linear-gradient(180deg, rgba(5, 8, 12, .94), rgba(5, 8, 12, .74));
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
@@ -107,8 +112,7 @@ header.acc-head strong {
 
 /* Sticky jump-nav — mono pills with a scroll-spy active state. */
 nav.acc-nav {
-  position: sticky;
-  top: 55px;
+  position: relative;
   z-index: 29;
   background: linear-gradient(180deg, rgba(5, 8, 12, .9), rgba(5, 8, 12, .62));
   -webkit-backdrop-filter: blur(16px);
@@ -396,6 +400,94 @@ mark { background: rgba(0, 199, 129, .85); color: #04130c; border-radius: 3px; p
 .acc-flash { animation: acc-flash-kf 1.6s ease-out; }
 
 .acc-hidden { display: none; }
+
+/* Custom metadata badges */
+.acc-meta-badges {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: 10px;
+}
+.acc-badge-meta {
+  display: inline-flex;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+}
+.acc-badge-key {
+  color: var(--faint);
+}
+.acc-badge-val {
+  color: var(--accent-2);
+}
+
+/* Interactive TODO checkboxes and completed state */
+.acc-todo-check {
+  margin-right: 10px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+}
+.acc-todo-done .acc-itemtitle {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Copy controls bar */
+.acc-todo-controls, .acc-docs-controls {
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+}
+.acc-todo-copy, .acc-docs-expand, .acc-docs-collapse {
+  font-size: 11px;
+}
+.acc-todo-copied {
+  color: var(--good) !important;
+  border-color: var(--good) !important;
+}
+
+/* Action command boxes in overview */
+.acc-cmd-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  background: rgba(0, 0, 0, .25);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  justify-content: space-between;
+}
+.acc-cmd-code {
+  font-size: 11px !important;
+  color: #bdecd6 !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+.acc-cmd-copy-btn {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  transition: color .15s, border-color .15s;
+}
+.acc-cmd-copy-btn:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
 
 /* Subtle cockpit scrollbar. */
 ::-webkit-scrollbar { width: 11px; height: 11px; }
