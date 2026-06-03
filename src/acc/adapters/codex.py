@@ -3,7 +3,7 @@ from ..ids import rel_posix
 from ..redaction import redact_text
 from ..frontmatter import parse_frontmatter
 from ..config import load_toml, safe_mcp, mcp_summary, as_dict
-from .generic import _first_heading, _first_paragraph, _strip_front_matter
+from .generic import _first_heading, _first_paragraph, _frontmatter_str, _strip_front_matter
 
 _CONFIG_FACTS = ("model", "model_reasoning_effort", "sandbox", "approval_policy")
 
@@ -42,8 +42,10 @@ class CodexAdapter:
                     continue
                 fields, body_text = parse_frontmatter(raw)
                 clean, _ = redact_text(body_text)
-                title = fields.get("name") or fields.get("title") or p.stem
-                summary = fields.get("description") or fields.get("summary") or _first_paragraph(clean)
+                title = _frontmatter_str(fields, "name") or _frontmatter_str(fields, "title") or p.stem
+                summary = (_frontmatter_str(fields, "description")
+                           or _frontmatter_str(fields, "summary")
+                           or _first_paragraph(clean))
                 item = make_item("codex", "command", "Codex prompt", title, rel, summary)
                 item["_rawBody"] = _strip_front_matter(clean)
                 meta = extract_metadata(fields)

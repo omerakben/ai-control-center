@@ -37,6 +37,18 @@ def test_prompts_map_into_commands_bucket(tmp_path):
     assert any(c["title"] == "refactor" and c["typeLabel"] == "Codex prompt" for c in cmds)
 
 
+def test_prompt_frontmatter_fallbacks_require_strings(tmp_path):
+    prompts = tmp_path / ".codex" / "prompts"
+    prompts.mkdir(parents=True)
+    (prompts / "bad_meta.md").write_text(
+        "---\nname: [bad]\ndescription: true\n---\nPrompt body summary.\n"
+    )
+    _, part = _normalize(tmp_path)
+    cmd = part["inventory"]["commands"][0]
+    assert cmd["title"] == "bad_meta"
+    assert cmd["summary"] == "Prompt body summary."
+
+
 def test_surfaces_agents_md_doc(tmp_path):
     make_codex_repo(tmp_path)
     _, part = _normalize(tmp_path)

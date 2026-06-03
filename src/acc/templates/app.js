@@ -19,7 +19,7 @@
   function updateTodoCopyButton() {
     var count = 0;
     Object.keys(todoState).forEach(function (id) {
-      if (todoState[id].checked) count++;
+      if (todoState[id].checked && todoState[id].rawLine) count++;
     });
     var copyBtn = document.querySelector(".acc-todo-copy");
     if (copyBtn) {
@@ -33,6 +33,7 @@
     Object.keys(todoState).forEach(function (id) {
       var state = todoState[id];
       if (state.checked) {
+        if (!state.rawLine) return;
         if (!files[state.path]) files[state.path] = [];
         files[state.path].push(state);
       }

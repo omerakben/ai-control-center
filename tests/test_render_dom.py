@@ -575,6 +575,20 @@ def test_todo_interaction_and_diff(page, tmp_path):
     assert "+- [x] task one" in diff_text
 
 
+def test_redacted_todos_do_not_emit_patch_diff(page, tmp_path):
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / "CLAUDE.md").write_text("# Rules\n\n- [ ] rotate token=abcdefghijkl\n")
+    page.set_content(_html(tmp_path))
+
+    check = page.locator('.acc-todo-check').first
+    btn = page.locator('.acc-todo-copy')
+    check.check()
+    assert check.is_checked()
+    assert btn.is_disabled()
+    assert "Copy Markdown Diff (0)" in btn.inner_text()
+    assert page.evaluate("() => window.__accBuildTodoDiff()") == ""
+
+
 def test_copy_buttons_handle_missing_or_rejected_clipboard(page, tmp_path):
     errors = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
