@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs
+from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs, extract_metadata
 from ..ids import rel_posix
 from ..redaction import redact_text
 from ..frontmatter import parse_frontmatter
@@ -71,18 +71,27 @@ class ClaudeAdapter:
                 item = make_item("claude", "agent", "Claude agent",
                                  _title(fields, stem), rel, _desc(fields))
                 item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                meta = extract_metadata(fields)
+                if meta:
+                    item["metadata"] = meta
                 inv["agents"].append(item)
             elif kind == "command":
                 fields, _ = parse_frontmatter(raw)
                 item = make_item("claude", "command", "Claude command",
                                  _title(fields, stem), rel, _desc(fields))
                 item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                meta = extract_metadata(fields)
+                if meta:
+                    item["metadata"] = meta
                 inv["commands"].append(item)
             elif kind == "skill":
                 fields, _ = parse_frontmatter(raw)
                 name = _title(fields, Path(rel).parent.name)
                 item = make_item("claude", "skill", "Claude skill", name, rel, _desc(fields))
                 item["_rawBody"] = _strip_front_matter(redact_text(raw)[0])
+                meta = extract_metadata(fields)
+                if meta:
+                    item["metadata"] = meta
                 inv["skills"].append(item)
             else:  # "doc" — CLAUDE.md at root or nested under .claude/
                 clean, _ = redact_text(raw)

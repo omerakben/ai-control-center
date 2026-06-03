@@ -80,7 +80,8 @@ def test_extract_todos_carry_stable_id():
     assert len(todos) == 2
     for t in todos:
         assert len(t["id"]) == 12
-        assert set(t.keys()) == {"id", "text", "path"}
+        assert set(t.keys()) == {"id", "text", "path", "rawLine"}
+    assert todos[0]["rawLine"] == "- [ ] first thing"
     # deterministic: same input -> same id
     again = _extract_todos("- [ ] first thing\n", "PLAN.md")
     assert again[0]["id"] == todos[0]["id"]

@@ -36,3 +36,26 @@ def test_doc_type_label_maps_buckets():
 
 def test_doc_type_label_unknown_bucket_titlecases():
     assert doc_type_label("misc") == "Misc"
+
+
+def test_extract_metadata_safe_fields():
+    from acc.adapters.base import extract_metadata
+    fields = {
+        "name": "omit",
+        "title": "omit",
+        "description": "omit",
+        "summary": "omit",
+        "version": "1.0.0",
+        "status": True,
+        "priority": 5,
+        "tags": ["dev", "prod"],
+        "nested": {"complex": "omit"}
+    }
+    meta = extract_metadata(fields)
+    assert meta == {
+        "version": "1.0.0",
+        "status": True,
+        "priority": 5,
+        "tags": ["dev", "prod"]
+    }
+

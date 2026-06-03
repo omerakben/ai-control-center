@@ -1,8 +1,9 @@
 import re
 from pathlib import Path
-from .base import ScanContext, ProviderRoot
+from .base import ScanContext, ProviderRoot, extract_metadata
 from ..ids import stable_id, rel_posix
 from ..redaction import redact_text
+from ..frontmatter import parse_frontmatter
 
 _TODO = re.compile(r"^\s*[-*+]\s*\[ \]\s*(.+)$")
 _HEADING = re.compile(r"^\s*#{1,6}\s+(.*)$")
@@ -83,7 +84,7 @@ def _extract_todos(text: str, rel: str) -> list[dict]:
         if m:
             todo_text = m.group(1).strip()
             out.append({"id": stable_id("generic", "todo", rel, todo_text),
-                        "text": todo_text, "path": rel})
+                        "text": todo_text, "path": rel, "rawLine": line})
     return out
 
 
@@ -128,18 +129,26 @@ class GenericAdapter:
                 raw = p.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            clean, _ = redact_text(raw)
-            heading = _first_heading(clean) or rel
-            docs.append({
+            fields, body_text = parse_frontmatter(raw)
+            clean, _ = redact_text(body_text)
+            heading = _first_heading(clean)
+            if not heading:
+                heading = fields.get("title") or fields.get("name") or rel
+            summary = _first_paragraph(clean)
+            if not summary:
+                # Use description/summary if paragraph is empty
+                summary = fields.get("description") or fields.get("summary") or ""
+            doc_item = {
                 "id": stable_id("generic", "doc", rel, heading),
                 "title": heading,
                 "path": rel,
-                "summary": _first_paragraph(clean),
-                # _refScanBody (the full redacted markdown) feeds both the
-                # relationship scan and the inline reading `body`; no server
-                # `html` is shipped — the client renders the body to DOM.
+                "summary": summary,
                 "_refScanBody": clean,
-            })
+            }
+            meta = extract_metadata(fields)
+            if meta:
+                doc_item["metadata"] = meta
+            docs.append(doc_item)
             todos.extend(_extract_todos(clean, rel))
             if rel.lower() == "readme.md" and heading:
                 title = heading

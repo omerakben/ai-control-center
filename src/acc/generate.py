@@ -286,6 +286,17 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
                 for field in ("title", "summary"):
                     if field in it:
                         it[field] = _redact_escape(it[field])
+                if "metadata" in it and isinstance(it["metadata"], dict):
+                    escaped_meta = {}
+                    for mk, mv in it["metadata"].items():
+                        ek = _redact_escape(mk)
+                        if isinstance(mv, str):
+                            escaped_meta[ek] = _redact_escape(mv)
+                        elif isinstance(mv, list):
+                            escaped_meta[ek] = [_redact_escape(x) if isinstance(x, str) else x for x in mv]
+                        else:
+                            escaped_meta[ek] = mv
+                    it["metadata"] = escaped_meta
                 # Capture a capped, escaped body slice on the SAME pass so the
                 # island stays uniformly escaped and the later _build_search reads
                 # escaped fields (Phase 1 contract). Source: a raw body if the
@@ -313,6 +324,8 @@ def _escape_text_fields(inv: dict, docs: dict, project: dict) -> None:
     for todo in project.get("openTodos", []):
         if "text" in todo:
             todo["text"] = _redact_escape(todo["text"])
+        if "rawLine" in todo:
+            todo["rawLine"] = _redact_escape(todo["rawLine"])
 
 
 def _redact_paths(data: dict) -> None:

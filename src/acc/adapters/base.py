@@ -70,3 +70,17 @@ def make_item(provider: str, kind: str, type_label: str,
         "path": path,
         "summary": summary,
     }
+
+
+def extract_metadata(fields: dict) -> dict:
+    """Filter and return safe metadata keys from parsed frontmatter."""
+    metadata = {}
+    for k, v in fields.items():
+        if k in ("name", "title", "description", "summary"):
+            continue
+        if isinstance(v, (str, bool, int, float)):
+            metadata[k] = v
+        elif isinstance(v, list) and all(isinstance(x, (str, bool, int, float)) for x in v):
+            metadata[k] = v
+    return metadata
+

@@ -1,6 +1,7 @@
-from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs
+from .base import ScanContext, ProviderRoot, make_item, empty_inventory, empty_docs, extract_metadata
 from ..ids import rel_posix
 from ..redaction import redact_text
+from ..frontmatter import parse_frontmatter
 from ..config import load_toml, safe_mcp, mcp_summary, as_dict
 from .generic import _first_heading, _first_paragraph, _strip_front_matter
 
@@ -39,11 +40,15 @@ class CodexAdapter:
                     raw = p.read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
-                clean, _ = redact_text(raw)
-                # prompts are invoked by filename, so the stem is the title
-                item = make_item("codex", "command", "Codex prompt", p.stem, rel,
-                                 _first_paragraph(clean))
+                fields, body_text = parse_frontmatter(raw)
+                clean, _ = redact_text(body_text)
+                title = fields.get("name") or fields.get("title") or p.stem
+                summary = fields.get("description") or fields.get("summary") or _first_paragraph(clean)
+                item = make_item("codex", "command", "Codex prompt", title, rel, summary)
                 item["_rawBody"] = _strip_front_matter(clean)
+                meta = extract_metadata(fields)
+                if meta:
+                    item["metadata"] = meta
                 inv["commands"].append(item)
             elif rel == "AGENTS.md" or (rel.startswith(".codex/") and rel.endswith("/AGENTS.md")):
                 try:
